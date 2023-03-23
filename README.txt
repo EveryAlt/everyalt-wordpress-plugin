@@ -4,7 +4,7 @@ Donate link: https://workwithhdc.com
 Tags: images, accessibility, alt text
 Requires at least: 5.5
 Tested up to: 6.1.1
-Stable tag: 0.0.1
+Stable tag: 0.0.2
 Requires PHP: 7.0
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -29,6 +29,13 @@ Explore all the features with our full [EveryAlt WordPress plugin tutorial](http
 1. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Changelog ==
+
+= 0.0.2 = 
+* Adds the ability to generate alt text for images if your site is behind basic authentication (e.g. a dev site)
+* Moves the EveryAlt menu item to the "Media" section rather than the "Settings" section of the sidebar
+* Adds functionality to the Gutenberg Block Editor to generate or re-generate alt text for an image block
+* Moves the "Generate Alt Text" button on individual Media Item editing pages closer to the actual alt text field
+* Adds an option to allow you to choose whether or not to append the full text of an image to the alt text. If you choose this and upload a screenshot or image with lots of text, EveryAlt will return both a brief description and the full transcript of the text within the image.
 
 = 0.0.1 =
 * Initial Release
