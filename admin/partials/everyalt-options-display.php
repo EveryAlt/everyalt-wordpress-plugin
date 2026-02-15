@@ -5,29 +5,24 @@
  * @package Every_Alt
  * @subpackage Every_Alt/admin/partials
  */
+$base_url = admin_url( 'upload.php?page=everyalt' );
 ?>
-<div class="everyalt-header">
-	<div class="everyalt-container">
-		<div class="everyalt-logo">
-			<img src="<?php echo esc_url( $logo_url ); ?>" alt="<?php esc_attr_e( 'Every Alt', 'everyalt' ); ?>">
-		</div>
-		<nav class="everyalt-nav">
-			<ul>
-				<li class="<?php echo $active === 'settings' ? 'active' : ''; ?>"><a href="<?php echo esc_url( admin_url( 'upload.php?page=everyalt&tab=settings' ) ); ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a></li>
-				<li class="<?php echo $active === 'bulk' ? 'active' : ''; ?>"><a href="<?php echo esc_url( admin_url( 'upload.php?page=everyalt&tab=bulk' ) ); ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a></li>
-				<li class="<?php echo $active === 'history' ? 'active' : ''; ?>"><a href="<?php echo esc_url( admin_url( 'upload.php?page=everyalt&tab=history' ) ); ?>"><?php esc_html_e( 'History', 'everyalt' ); ?></a></li>
-			</ul>
-		</nav>
-	</div>
-</div>
+<div class="wrap">
+	<h1 class="wp-heading-inline"><?php esc_html_e( 'EveryAlt', 'everyalt' ); ?></h1>
+	<hr class="wp-header-end">
+	<h2 class="nav-tab-wrapper wp-clearfix" aria-label="<?php esc_attr_e( 'Secondary menu', 'everyalt' ); ?>">
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'history', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'history' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'History', 'everyalt' ); ?></a>
+	</h2>
 
 <?php if ( isset( $_GET['updated'] ) && $_GET['updated'] === '1' ) : ?>
 	<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'everyalt' ); ?></p></div>
 <?php endif; ?>
 
 <?php if ( $active === 'settings' ) : ?>
-	<div class="wrap everyalt-settings-wrap">
-		<h1><?php esc_html_e( 'EveryAlt Settings', 'everyalt' ); ?></h1>
+	<div class="everyalt-settings-wrap">
+		<h2><?php esc_html_e( 'Settings', 'everyalt' ); ?></h2>
 		<form method="post" action="">
 			<?php wp_nonce_field( 'everyalt_save_settings', 'everyalt_settings_nonce' ); ?>
 			<table class="form-table" role="presentation">
@@ -88,8 +83,8 @@
 	<?php
 	$error = isset( $this->error ) ? $this->error : false;
 	?>
-	<div class="wrap everyalt-bulk-wrap">
-		<h1><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h1>
+	<div class="everyalt-bulk-wrap">
+		<h2><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h2>
 		<?php if ( $error ) : ?>
 			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
 		<?php elseif ( ! empty( $secret_key ) ) : ?>
@@ -175,8 +170,8 @@
 <?php endif; ?>
 
 <?php if ( $active === 'history' ) : ?>
-	<div class="wrap everyalt-history-wrap">
-		<h1><?php esc_html_e( 'History', 'everyalt' ); ?></h1>
+	<div class="everyalt-history-wrap">
+		<h2><?php esc_html_e( 'History', 'everyalt' ); ?></h2>
 		<?php if ( ! empty( $images['images'] ) ) : ?>
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
@@ -212,3 +207,4 @@
 		<?php endif; ?>
 	</div>
 <?php endif; ?>
+</div><!-- .wrap -->
