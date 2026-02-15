@@ -6,6 +6,8 @@
 
 	var restUrl = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.restUrl : '';
 	var restNonce = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.restNonce : '';
+	var ajaxUrl = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.ajaxUrl : '';
+	var validateKeyNonce = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.validateKeyNonce : '';
 
 	function request(method, path, body) {
 		var url = restUrl.replace(/\/$/, '') + path;
@@ -22,6 +24,46 @@
 		return fetch(url, opts).then(function(r) {
 			if (!r.ok) throw new Error(r.statusText);
 			return r.json();
+		});
+	}
+
+	// Validate API key (Settings tab)
+	var validateKeyBtn = document.getElementById('everyalt-validate-key');
+	if (validateKeyBtn) {
+		var resultEl = document.getElementById('everyalt-validate-result');
+		validateKeyBtn.addEventListener('click', function() {
+			var keyInput = document.getElementById('every_alt_openai_key');
+			var key = keyInput ? keyInput.value.trim() : '';
+			if (!resultEl) return;
+			resultEl.style.display = 'none';
+			resultEl.className = 'everyalt-validate-result';
+			validateKeyBtn.disabled = true;
+			var formData = new FormData();
+			formData.append('action', 'everyalt_validate_key');
+			formData.append('nonce', validateKeyNonce);
+			formData.append('key', key);
+			fetch(ajaxUrl, {
+				method: 'POST',
+				body: formData,
+				credentials: 'same-origin'
+			})
+				.then(function(r) { return r.json(); })
+				.then(function(data) {
+					validateKeyBtn.disabled = false;
+					resultEl.style.display = 'block';
+					var msg = (data.data && data.data.message) ? data.data.message : (data.success ? '' : 'Error');
+					resultEl.className = 'everyalt-validate-result notice ' + (data.success ? 'notice-success' : 'notice-error');
+					resultEl.textContent = '';
+					var p = document.createElement('p');
+					p.textContent = msg;
+					resultEl.appendChild(p);
+				})
+				.catch(function() {
+					validateKeyBtn.disabled = false;
+					resultEl.style.display = 'block';
+					resultEl.className = 'everyalt-validate-result notice notice-error';
+					resultEl.innerHTML = '<p>Request failed.</p>';
+				});
 		});
 	}
 

@@ -13,7 +13,6 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<h2 class="nav-tab-wrapper wp-clearfix" aria-label="<?php esc_attr_e( 'Secondary menu', 'everyalt' ); ?>">
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'history', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'history' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'History', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
 	</h2>
 
@@ -33,8 +32,12 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<tr>
 					<th scope="row"><label for="every_alt_openai_key"><?php esc_html_e( 'OpenAI API Key', 'everyalt' ); ?></label></th>
 					<td>
-						<input type="password" name="every_alt_openai_key" id="every_alt_openai_key" value="" class="regular-text" autocomplete="off" placeholder="<?php esc_attr_e( 'Leave blank to keep existing key', 'everyalt' ); ?>">
-						<p class="description"><?php esc_html_e( 'Your OpenAI API key. Alt text is generated via OpenAI (image is sent as base64, so it works on localhost and behind HTTP auth). Stored encrypted.', 'everyalt' ); ?></p>
+						<span class="everyalt-key-row">
+							<input type="password" name="every_alt_openai_key" id="every_alt_openai_key" value="" class="regular-text" autocomplete="off" placeholder="<?php esc_attr_e( 'Leave blank to keep existing key', 'everyalt' ); ?>">
+							<button type="button" id="everyalt-validate-key" class="button"><?php esc_html_e( 'Validate key', 'everyalt' ); ?></button>
+						</span>
+						<p id="everyalt-validate-result" class="everyalt-validate-result" aria-live="polite" style="display:none; margin-top:0.5em;"></p>
+						<p class="description"><?php esc_html_e( 'Alt text is generated via OpenAI (image is sent as base64, so it works on localhost and behind HTTP auth). Stored encrypted. You are charged by OpenAI for your usage; EveryAlt is free and never bills you.', 'everyalt' ); ?> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Generate an API key', 'everyalt' ); ?></a></p>
 					</td>
 				</tr>
 				<tr>
@@ -44,14 +47,40 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</td>
 				</tr>
 				<tr>
+					<th scope="row"><label for="every_alt_max_completion_tokens"><?php esc_html_e( 'Max completion tokens', 'everyalt' ); ?></label></th>
+					<td>
+						<input type="number" name="every_alt_max_completion_tokens" id="every_alt_max_completion_tokens" value="<?php echo esc_attr( get_option( 'every_alt_max_completion_tokens', '1024' ) ); ?>" min="1" max="128000" step="1" class="small-text">
+						<p class="description"><?php esc_html_e( 'Maximum tokens the model can use for the response (including reasoning for models like gpt-5-nano). Default 1024. Leave empty to use default.', 'everyalt' ); ?></p>
+						<?php
+						$model_for_display = apply_filters( Every_Alt_OpenAI::FILTER_MODEL, 'gpt-5-nano' );
+						$input_price       = (float) apply_filters( Every_Alt_OpenAI::FILTER_INPUT_PRICE_PER_MILLION, Every_Alt_OpenAI::DEFAULT_INPUT_PRICE_PER_MILLION );
+						$output_price      = (float) apply_filters( Every_Alt_OpenAI::FILTER_OUTPUT_PRICE_PER_MILLION, Every_Alt_OpenAI::DEFAULT_OUTPUT_PRICE_PER_MILLION );
+						$estimate_cents    = ( 200 * $input_price / 1000000 + 500 * $output_price / 1000000 ) * 100;
+						?>
+						<p class="description" style="margin-top:1em;">
+							<?php
+							echo wp_kses_post(
+								sprintf(
+									/* translators: 1: model name, 2: cost in cents e.g. 0.0210¢ */
+									__( 'Pricing: EveryAlt uses <strong>%1$s</strong>, currently the cheapest and most efficient model for this task. A reasonable estimate per image is about 200 input tokens and 500 output tokens, which works out to about <strong>%2$s</strong> per image.', 'everyalt' ),
+									esc_html( $model_for_display ),
+									number_format( $estimate_cents, 4 ) . '¢'
+								)
+							);
+							?>
+						</p>
+					</td>
+				</tr>
+				<tr>
 					<th scope="row"><label for="every_alt_vision_prompt"><?php esc_html_e( 'Alt text prompt', 'everyalt' ); ?></label></th>
 					<td>
 						<?php
-						$current_prompt = get_option( 'every_alt_vision_prompt', '' );
-						$placeholder    = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
+						$default_prompt  = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
+						$current_prompt  = get_option( 'every_alt_vision_prompt', '' );
+						$editable_prompt = $current_prompt !== '' ? $current_prompt : $default_prompt;
 						?>
-						<textarea name="every_alt_vision_prompt" id="every_alt_vision_prompt" class="large-text" rows="4" placeholder="<?php echo esc_attr( $placeholder ); ?>"><?php echo esc_textarea( $current_prompt ); ?></textarea>
-						<p class="description"><?php esc_html_e( 'Instruction sent to the AI with each image. Leave blank to use the default prompt. The model should return only the alt text, no extra wording.', 'everyalt' ); ?></p>
+						<textarea name="every_alt_vision_prompt" id="every_alt_vision_prompt" class="large-text" rows="4"><?php echo esc_textarea( $editable_prompt ); ?></textarea>
+						<p class="description"><?php esc_html_e( 'Instruction sent to the AI with each image. Edit as needed. The model should return only the alt text, no extra wording.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 			</table>
@@ -137,6 +166,11 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="everyalt-logs-wrap">
 		<h2><?php esc_html_e( 'Generation Log', 'everyalt' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Last 100 alt text generation attempts (successes and failures).', 'everyalt' ); ?></p>
+		<p>
+			<a href="<?php echo esc_url( add_query_arg( array( 'tab' => 'logs', 'export_csv' => '1', '_wpnonce' => wp_create_nonce( 'everyalt_export_logs' ) ), $base_url ) ); ?>" class="button">
+				<?php esc_html_e( 'Export as CSV', 'everyalt' ); ?>
+			</a>
+		</p>
 		<?php if ( ! empty( $generation_log ) ) : ?>
 			<table class="wp-list-table widefat fixed striped">
 				<thead>
@@ -145,6 +179,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						<th style="width:90px"><?php esc_html_e( 'Attachment', 'everyalt' ); ?></th>
 						<th style="width:80px"><?php esc_html_e( 'Status', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Message / Alt text', 'everyalt' ); ?></th>
+						<th style="width:140px"><?php esc_html_e( 'Usage', 'everyalt' ); ?></th>
+						<th style="width:90px"><?php esc_html_e( 'Cost', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Details', 'everyalt' ); ?></th>
 					</tr>
 				</thead>
@@ -178,7 +214,11 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 								?>
 							</td>
 							<td><?php echo esc_html( isset( $entry['message'] ) ? $entry['message'] : '' ); ?></td>
-							<td class="everyalt-log-detail" style="max-width:320px; overflow-wrap: break-word;"><?php echo esc_html( isset( $entry['detail'] ) ? $entry['detail'] : '' ); ?></td>
+							<td><?php echo esc_html( isset( $entry['usage'] ) ? $entry['usage'] : '—' ); ?></td>
+							<td><?php echo esc_html( isset( $entry['cost'] ) ? $entry['cost'] : '—' ); ?></td>
+							<td class="everyalt-log-detail">
+								<div class="everyalt-log-detail-inner"><?php echo esc_html( isset( $entry['detail'] ) ? $entry['detail'] : '' ); ?></div>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -189,42 +229,4 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	</div>
 <?php endif; ?>
 
-<?php if ( $active === 'history' ) : ?>
-	<div class="everyalt-history-wrap">
-		<h2><?php esc_html_e( 'History', 'everyalt' ); ?></h2>
-		<?php if ( ! empty( $images['images'] ) ) : ?>
-			<table class="wp-list-table widefat fixed striped">
-				<thead>
-					<tr>
-						<th><?php esc_html_e( 'Image', 'everyalt' ); ?></th>
-						<th><?php esc_html_e( 'Alt text', 'everyalt' ); ?></th>
-						<th style="width:100px"><?php esc_html_e( 'Actions', 'everyalt' ); ?></th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ( $images['images'] as $item ) : ?>
-						<tr data-media-id="<?php echo (int) $item['media_id']; ?>" data-log-id="<?php echo (int) $item['id']; ?>">
-							<td>
-								<a href="<?php echo esc_url( $item['media_link'] ); ?>"><?php echo wp_get_attachment_image( $item['media_id'], 'thumbnail' ); ?></a>
-							</td>
-							<td>
-								<textarea class="everyalt-alt-field large-text" rows="3" data-media-id="<?php echo (int) $item['media_id']; ?>" data-log-id="<?php echo (int) $item['id']; ?>"><?php echo esc_textarea( $item['alt_text'] ); ?></textarea>
-							</td>
-							<td>
-								<button type="button" class="button everyalt-save-alt" data-nonce="<?php echo esc_attr( wp_create_nonce( 'every_alt_nonce' ) ); ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-			<?php if ( ! empty( $images['pagination'] ) ) : ?>
-				<div class="tablenav bottom">
-					<div class="tablenav-pages"><?php echo $images['pagination']; ?></div>
-				</div>
-			<?php endif; ?>
-		<?php else : ?>
-			<p><?php esc_html_e( 'No alt text generated yet.', 'everyalt' ); ?></p>
-		<?php endif; ?>
-	</div>
-<?php endif; ?>
 </div><!-- .wrap -->

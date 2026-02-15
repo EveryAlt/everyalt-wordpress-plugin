@@ -43,8 +43,10 @@ class Every_Alt_Admin {
 	 * @param string $status   'success' or 'error'
 	 * @param string $message  Short message
 	 * @param string $detail   Optional longer detail (e.g. API error body)
+	 * @param string $usage    Optional token usage (e.g. "Prompt: 193, Completion: 12, Total: 205")
+	 * @param string $cost     Optional estimated cost in cents (e.g. "0.0123¢" for gpt-5-nano)
 	 */
-	private function every_alt_add_generation_log( $attachment_id, $status, $message, $detail = '' ) {
+	private function every_alt_add_generation_log( $attachment_id, $status, $message, $detail = '', $usage = '', $cost = '' ) {
 		$log   = get_option( self::GENERATION_LOG_OPTION, array() );
 		$entry = array(
 			'time'          => current_time( 'mysql' ),
@@ -52,6 +54,8 @@ class Every_Alt_Admin {
 			'status'        => $status,
 			'message'       => $message,
 			'detail'        => $detail,
+			'usage'         => $usage,
+			'cost'          => $cost,
 		);
 		array_unshift( $log, $entry );
 		$log = array_slice( $log, 0, self::GENERATION_LOG_MAX );
@@ -66,6 +70,70 @@ class Every_Alt_Admin {
 	public function every_alt_get_generation_log() {
 		$log = get_option( self::GENERATION_LOG_OPTION, array() );
 		return is_array( $log ) ? $log : array();
+	}
+
+	/**
+	 * Send generation log as a CSV download. Exits after output.
+	 */
+	public function every_alt_export_logs_csv() {
+		$log = $this->every_alt_get_generation_log();
+		$filename = 'everyalt-generation-log-' . gmdate( 'Y-m-d-His' ) . '.csv';
+		header( 'Content-Type: text/csv; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename=' . $filename );
+		header( 'Cache-Control: no-cache, must-revalidate' );
+		header( 'Pragma: no-cache' );
+		$out = fopen( 'php://output', 'w' );
+		if ( $out === false ) {
+			return;
+		}
+		// UTF-8 BOM so Excel opens the file with correct encoding.
+		fprintf( $out, "\xEF\xBB\xBF" );
+		$headers = array(
+			__( 'Time', 'everyalt' ),
+			__( 'Attachment ID', 'everyalt' ),
+			__( 'Status', 'everyalt' ),
+			__( 'Message / Alt text', 'everyalt' ),
+			__( 'Usage', 'everyalt' ),
+			__( 'Cost', 'everyalt' ),
+			__( 'Details', 'everyalt' ),
+		);
+		fputcsv( $out, $headers );
+		foreach ( $log as $entry ) {
+			$status_label = ( isset( $entry['status'] ) && $entry['status'] === 'success' ) ? __( 'Success', 'everyalt' ) : __( 'Error', 'everyalt' );
+			$row = array(
+				isset( $entry['time'] ) ? $entry['time'] : '',
+				isset( $entry['attachment_id'] ) ? $entry['attachment_id'] : '',
+				$status_label,
+				isset( $entry['message'] ) ? $entry['message'] : '',
+				isset( $entry['usage'] ) ? $entry['usage'] : '',
+				isset( $entry['cost'] ) ? $entry['cost'] : '',
+				isset( $entry['detail'] ) ? $entry['detail'] : '',
+			);
+			fputcsv( $out, $row );
+		}
+		fclose( $out );
+		exit;
+	}
+
+	/**
+	 * AJAX: Validate OpenAI API key (key from POST or stored key if empty).
+	 */
+	public function ajax_validate_key() {
+		check_ajax_referer( 'everyalt_validate_key', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'You do not have permission to do this.', 'everyalt' ) ) );
+		}
+		$key = isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '';
+		if ( $key === '' ) {
+			$key = $this->get_openai_key();
+		}
+		if ( $key === '' ) {
+			wp_send_json_error( array( 'message' => __( 'Enter an API key in the field above, or save a key first to validate the stored key.', 'everyalt' ) ) );
+		}
+		if ( Every_Alt_OpenAI::validate_api_key( $key ) ) {
+			wp_send_json_success( array( 'message' => __( 'API key is valid.', 'everyalt' ) ) );
+		}
+		wp_send_json_error( array( 'message' => __( 'API key could not be validated. Check that the key is correct and has API access.', 'everyalt' ) ) );
 	}
 
 	/**
@@ -145,8 +213,10 @@ class Every_Alt_Admin {
 				true
 			);
 			wp_localize_script( $this->plugin_name, 'everyaltAdmin', array(
-				'restUrl'  => rest_url(),
-				'restNonce' => wp_create_nonce( 'wp_rest' ),
+				'restUrl'          => rest_url(),
+				'restNonce'        => wp_create_nonce( 'wp_rest' ),
+				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+				'validateKeyNonce' => wp_create_nonce( 'everyalt_validate_key' ),
 			) );
 		}
 	}
@@ -281,17 +351,23 @@ class Every_Alt_Admin {
 		$generated_alt = $openai->generate_alt( $attachment_ID );
 
 		if ( ! empty( $generated_alt->error ) ) {
-			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $generated_alt->error_detail );
+			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
+			$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $generated_alt->error_detail, $usage, $cost );
 			return null;
 		}
 		if ( empty( $generated_alt->alt ) ) {
-			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'No alt text returned from API.', 'everyalt' ), '' );
+			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
+			$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'No alt text returned from API.', 'everyalt' ), '', $usage, $cost );
 			return null;
 		}
 
 		update_post_meta( $attachment_ID, '_wp_attachment_image_alt', $generated_alt->alt );
 		$this->every_alt_media_logs( $generated_alt->alt, $attachment_ID );
-		$this->every_alt_add_generation_log( $attachment_ID, 'success', $generated_alt->alt, '' );
+		$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
+		$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
+		$this->every_alt_add_generation_log( $attachment_ID, 'success', $generated_alt->alt, '', $usage, $cost );
 
 		if ( $bulk ) {
 			return $generated_alt;
@@ -487,6 +563,11 @@ class Every_Alt_Admin {
 	 * @since  1.0.0
 	 */
 	public function display_options_page() {
+		// Export logs as CSV (must run before any output).
+		if ( isset( $_GET['export_csv'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'everyalt_export_logs' ) ) {
+			$this->every_alt_export_logs_csv();
+			return;
+		}
 
 		$tab = isset($_GET['tab']) && !empty($_GET['tab']) ? $_GET['tab'] : 'settings';
 		$active = $tab;
@@ -495,11 +576,6 @@ class Every_Alt_Admin {
 		$has_openai_key = ! empty( $this->get_openai_key() );
 		$plugin_url     = plugins_url( '/', __DIR__ );
 		$logo_url       = $plugin_url . 'assets/everyalt-logo.png';
-
-		if($active == 'history'){
-			$images = $this->every_alt_get_images();
-		}
-
 
 		if ( $active === 'bulk' ) {
 			$images_without_alt = $this->every_alt_get_images_without_alt();
@@ -591,6 +667,10 @@ class Every_Alt_Admin {
 		update_option( $this->option_name . '_fulltext', ! empty( $_POST[ $this->option_name . '_fulltext' ] ) ? 1 : 0 );
 		if ( isset( $_POST['every_alt_vision_prompt'] ) ) {
 			update_option( 'every_alt_vision_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_vision_prompt'] ) ) );
+		}
+		if ( isset( $_POST['every_alt_max_completion_tokens'] ) ) {
+			$val = sanitize_text_field( wp_unslash( $_POST['every_alt_max_completion_tokens'] ) );
+			update_option( 'every_alt_max_completion_tokens', $val === '' ? '' : max( 1, (int) $val ) );
 		}
 		if ( isset( $_POST[ $this->option_name . '_httpuser' ] ) ) {
 			update_option( $this->option_name . '_httpuser', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpuser' ] ) ) );

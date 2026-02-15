@@ -175,6 +175,7 @@ class Every_Alt {
 
 		//ajax
 		// $this->loader->add_action( 'wp_ajax_every_alt_generate_alt_image', $plugin_admin, 'every_alt_generate_alt_image' );
+		$this->loader->add_action( 'wp_ajax_everyalt_validate_key', $plugin_admin, 'ajax_validate_key' );
 
 		
 		//auto

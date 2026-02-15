@@ -17,6 +17,21 @@ class Every_Alt_OpenAI {
 
 	const DEFAULT_PROMPT = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
 
+	// Reasoning models (e.g. gpt-5-nano) use tokens for internal "thinking"; we need enough for reasoning + actual output.
+	const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
+
+	/** Filter: change the model used in the API call. Default 'gpt-5-nano'. */
+	const FILTER_MODEL = 'everyalt_openai_model';
+
+	/** Filter: input token price in dollars per 1M tokens. Default 0.05 (gpt-5-nano). */
+	const FILTER_INPUT_PRICE_PER_MILLION = 'everyalt_input_token_price_per_million';
+
+	/** Filter: output token price in dollars per 1M tokens. Default 0.40 (gpt-5-nano). */
+	const FILTER_OUTPUT_PRICE_PER_MILLION = 'everyalt_output_token_price_per_million';
+
+	const DEFAULT_INPUT_PRICE_PER_MILLION  = 0.05;
+	const DEFAULT_OUTPUT_PRICE_PER_MILLION = 0.40;
+
 	/** @var string */
 	private $api_key;
 
@@ -51,7 +66,7 @@ class Every_Alt_OpenAI {
 
 	public function __construct( $api_key ) {
 		$this->api_key = $api_key;
-		$this->model   = apply_filters( 'everyalt_openai_model', 'gpt-5-nano' );
+		$this->model   = apply_filters( self::FILTER_MODEL, 'gpt-5-nano' );
 	}
 
 	/**
@@ -116,7 +131,23 @@ class Every_Alt_OpenAI {
 		if ( $bytes === false ) {
 			return (object) array( 'alt' => null, 'error' => 'Could not read image file.', 'error_detail' => $path );
 		}
-		$base64   = base64_encode( $bytes );
+		$base64_encode_error = __( 'Image could not be encoded for the API. On some servers, base64 encoding fails for large images or due to PHP limits. Try a smaller image, or increase your server\'s PHP memory limit.', 'everyalt' );
+		try {
+			$base64 = base64_encode( $bytes );
+		} catch ( \Throwable $e ) {
+			return (object) array(
+				'alt'          => null,
+				'error'        => $base64_encode_error,
+				'error_detail' => $e->getMessage(),
+			);
+		}
+		if ( $bytes !== '' && $base64 === '' ) {
+			return (object) array(
+				'alt'          => null,
+				'error'        => $base64_encode_error,
+				'error_detail' => $path,
+			);
+		}
 		$mime     = $this->get_mime_type( $path );
 		$data_url = 'data:' . $mime . ';base64,' . $base64;
 
@@ -124,9 +155,12 @@ class Every_Alt_OpenAI {
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
 		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
 
+		$saved_max   = get_option( 'every_alt_max_completion_tokens', '' );
+		$max_tokens  = $saved_max !== '' ? max( 1, (int) $saved_max ) : self::DEFAULT_MAX_COMPLETION_TOKENS;
+		$max_tokens  = apply_filters( 'everyalt_max_completion_tokens', $max_tokens );
 		$body = array(
-			'model'      => $this->model,
-			'max_completion_tokens' => 300,
+			'model'                   => $this->model,
+			'max_completion_tokens'   => (int) $max_tokens,
 			'messages'   => array(
 				array(
 					'role'    => 'user',
@@ -164,13 +198,19 @@ class Every_Alt_OpenAI {
 				'alt'          => null,
 				'error'        => 'Request failed: ' . $response->get_error_message(),
 				'error_detail' => '',
+				'usage'        => '',
+				'cost'         => '',
 			);
 		}
 		$code     = wp_remote_retrieve_response_code( $response );
 		$body_raw = wp_remote_retrieve_body( $response );
+		$json     = json_decode( $body_raw, true );
+		$usage_raw = isset( $json['usage'] ) ? $json['usage'] : null;
+		$usage    = self::format_usage( $usage_raw );
+		$cost     = $this->format_cost( $usage_raw );
+
 		if ( $code < 200 || $code >= 300 ) {
 			$detail = $body_raw;
-			$json   = json_decode( $body_raw, true );
 			if ( isset( $json['error']['message'] ) ) {
 				$detail = $json['error']['message'];
 			}
@@ -178,18 +218,99 @@ class Every_Alt_OpenAI {
 				'alt'          => null,
 				'error'        => 'OpenAI API returned ' . $code,
 				'error_detail' => $detail,
+				'usage'        => $usage,
+				'cost'         => $cost,
 			);
 		}
-		$json = json_decode( $body_raw, true );
-		if ( empty( $json['choices'][0]['message']['content'] ) ) {
+		$content       = isset( $json['choices'][0]['message']['content'] ) ? $json['choices'][0]['message']['content'] : null;
+		$finish_reason = isset( $json['choices'][0]['finish_reason'] ) ? $json['choices'][0]['finish_reason'] : '';
+
+		// Content can be a string or an array of content parts (e.g. [ { "type": "text", "text": "..." } ] ).
+		$alt = '';
+		if ( is_string( $content ) ) {
+			$alt = $content;
+		} elseif ( is_array( $content ) ) {
+			foreach ( $content as $part ) {
+				if ( isset( $part['type'] ) && $part['type'] === 'text' && isset( $part['text'] ) ) {
+					$alt .= $part['text'];
+				}
+			}
+		}
+
+		$alt = trim( $alt );
+
+		if ( $finish_reason === 'length' ) {
+			$length_message = __( 'Response was cut off (max tokens reached). Increase Max completion tokens in Settings to resolve this.', 'everyalt' );
+			return (object) array(
+				'alt'          => null,
+				'error'        => $length_message,
+				'error_detail' => $alt !== '' ? $alt : $body_raw,
+				'usage'        => $usage,
+				'cost'         => $cost,
+			);
+		}
+
+		if ( $alt === '' ) {
 			return (object) array(
 				'alt'          => null,
 				'error'        => 'OpenAI response had no content.',
-				'error_detail' => substr( $body_raw, 0, 500 ),
+				'error_detail' => $body_raw,
+				'usage'        => $usage,
+				'cost'         => $cost,
 			);
 		}
-		$alt = trim( $json['choices'][0]['message']['content'] );
 		$alt = sanitize_text_field( $alt );
-		return (object) array( 'alt' => $alt, 'error' => null, 'error_detail' => null );
+		return (object) array( 'alt' => $alt, 'error' => null, 'error_detail' => null, 'usage' => $usage, 'cost' => $cost );
+	}
+
+	/**
+	 * Format usage array from API response for display.
+	 *
+	 * @param array|null $usage
+	 * @return string
+	 */
+	private static function format_usage( $usage ) {
+		if ( ! is_array( $usage ) ) {
+			return '';
+		}
+		$p = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : null;
+		$c = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : null;
+		$t = isset( $usage['total_tokens'] ) ? (int) $usage['total_tokens'] : null;
+		if ( $p === null && $c === null && $t === null ) {
+			return '';
+		}
+		$parts = array();
+		if ( $p !== null ) {
+			$parts[] = 'Prompt: ' . $p;
+		}
+		if ( $c !== null ) {
+			$parts[] = 'Completion: ' . $c;
+		}
+		if ( $t !== null ) {
+			$parts[] = 'Total: ' . $t;
+		}
+		return implode( ', ', $parts );
+	}
+
+	/**
+	 * Format estimated cost for display in cents. Uses filtered input/output price per 1M tokens.
+	 *
+	 * @param array|null $usage API usage array with prompt_tokens, completion_tokens.
+	 * @return string Formatted cost e.g. "0.0123¢" or empty string if no usage.
+	 */
+	private function format_cost( $usage ) {
+		if ( ! is_array( $usage ) ) {
+			return '';
+		}
+		$p = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : 0;
+		$c = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : 0;
+		if ( $p === 0 && $c === 0 ) {
+			return '';
+		}
+		$input_price  = (float) apply_filters( self::FILTER_INPUT_PRICE_PER_MILLION, self::DEFAULT_INPUT_PRICE_PER_MILLION );
+		$output_price = (float) apply_filters( self::FILTER_OUTPUT_PRICE_PER_MILLION, self::DEFAULT_OUTPUT_PRICE_PER_MILLION );
+		$cost_dollars = ( $p * $input_price / 1000000 ) + ( $c * $output_price / 1000000 );
+		$cost_cents   = $cost_dollars * 100;
+		return number_format( $cost_cents, 4 ) . '¢';
 	}
 }
