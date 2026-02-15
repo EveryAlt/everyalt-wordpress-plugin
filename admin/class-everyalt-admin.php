@@ -594,8 +594,6 @@ class Every_Alt_Admin {
 		
 
 		$has_openai_key = ! empty( $this->get_openai_key() );
-		$plugin_url     = plugins_url( '/', __DIR__ );
-		$logo_url       = $plugin_url . 'assets/everyalt-logo.png';
 
 		if ( $active === 'bulk' ) {
 			$images_without_alt = $this->every_alt_get_images_without_alt();
