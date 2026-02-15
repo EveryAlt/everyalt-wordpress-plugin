@@ -16,3 +16,6 @@ dist/
 
 # Logs
 *.log
+
+# Security audit (internal use)
+SECURITY-AUDIT.md
