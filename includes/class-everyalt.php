@@ -170,6 +170,7 @@ class Every_Alt {
 
 		
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'register_setting' );
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_save_settings' );
 		$this->loader->add_action( 'rest_api_init', $plugin_admin, 'register_setting' );
 		$this->loader->add_action( 'rest_api_init', $plugin_admin,'every_alt_custom_admin_endpoints' );
 

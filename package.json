@@ -21,7 +21,7 @@
     "test": "npm run lint",
     "lint": "npm run lint:js && npm run lint:css",
     "lint:js": "eslint resources/scripts",
-    "lint:css": "stylelint \"resources/**/*.{css,scss,vue}\"",
+    "lint:css": "stylelint \"resources/**/*.{css,scss}\"",
     "translate": "npm run translate:pot && npm run translate:js",
     "translate:pot": "wp i18n make-pot . ./resources/lang/sage.pot --ignore-domain --include=\"app,resources\"",
     "translate:js": "wp i18n make-json ./resources/lang --pretty-print"

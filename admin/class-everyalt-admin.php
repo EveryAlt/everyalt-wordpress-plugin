@@ -78,44 +78,36 @@ class Every_Alt_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles() {
-
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array('wp-components'), $this->version, 'all' );
-	
+		// Only load our minimal admin CSS on plugin pages (no wp-components).
+		if ( isset( $_GET['page'] ) && $_GET['page'] === 'everyalt' ) {
+			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array(), $this->version, 'all' );
+		}
 	}
 
 	/**
-	 * Register the JavaScript for the admin area.
-	 *
-	 * @since    1.0.0
+	 * Register the JavaScript for the admin area (simple UI, no Vue/React).
 	 */
 	public function enqueue_scripts() {
-		if(isset($_GET['page']) && $_GET['page'] == 'everyalt'){
-			$tab = isset($_GET['tab']) && !empty($_GET['tab']) ? $_GET['tab'] : 'settings';
-			switch ($tab) {
-				case 'settings':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-admin.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
-				break;
-
-				case 'bulk':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-bulk.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
-				break;
-
-				case 'history':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-history.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
-				break;
-				
-				default:
-				break;
-			}
+		if ( isset( $_GET['page'] ) && $_GET['page'] === 'everyalt' ) {
+			wp_enqueue_script(
+				$this->plugin_name,
+				plugin_dir_url( __FILE__ ) . 'js/everyalt-admin-simple.js',
+				array( 'jquery' ),
+				$this->version,
+				true
+			);
+			wp_localize_script( $this->plugin_name, 'everyaltAdmin', array(
+				'restUrl'  => rest_url(),
+				'restNonce' => wp_create_nonce( 'wp_rest' ),
+			) );
 		}
-
 	}
 
 	//redirect after activation
 
-	//block
-	public function add_custom_button_to_image_block(){
-		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-gutenberg-button.js', array( 'wp-blocks', 'wp-components', 'wp-compose', 'wp-plugins', 'wp-edit-post','wp-data' ), $this->version, true );
+	// Gutenberg block editor: no longer adding React button (simple UI only).
+	public function add_custom_button_to_image_block() {
+		// Left empty – use Media Library or Bulk tab instead.
 	}
 
 
@@ -161,15 +153,25 @@ class Every_Alt_Admin {
 	}
 
 
-	//custom btn on media edita page
+	// Custom button on media edit page (simple WordPress UI).
 	public function every_alt_custom_button_to_media_edit_page() {
-		
 		global $post;
-		if($this->every_alt_is_valid_image($post->ID) && $this->is_user_authorized()){
-			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-media-button.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
-			include_once 'partials/everyalt-custom-media-button.php';
+		if ( ! $post || ! $this->every_alt_is_valid_image( $post->ID ) || ! $this->is_user_authorized() ) {
+			return;
 		}
-
+		wp_enqueue_script(
+			$this->plugin_name . '-media',
+			plugin_dir_url( __FILE__ ) . 'js/everyalt-media-simple.js',
+			array( 'jquery' ),
+			$this->version,
+			true
+		);
+		wp_localize_script( $this->plugin_name . '-media', 'everyaltMedia', array(
+			'restUrl'   => rest_url(),
+			'restNonce' => wp_create_nonce( 'wp_rest' ),
+			'mediaId'   => (int) $post->ID,
+		) );
+		include_once 'partials/everyalt-custom-media-button.php';
 	}
 
 	//add username and password
@@ -506,8 +508,9 @@ class Every_Alt_Admin {
 
 
 		if($active == 'bulk'){
-			$images = $this->every_alt_get_images_without_alt();
-			$images = wp_list_pluck($images,'ID');
+			$images_without_alt = $this->every_alt_get_images_without_alt();
+			$bulk_image_ids = wp_list_pluck($images_without_alt,'ID');
+			$history = $this->every_alt_get_images();
 
 			if($secret_key){
 				$every_alt_curls = new Every_Alt_Curls($secret_key);
@@ -521,6 +524,7 @@ class Every_Alt_Admin {
 					$used_tokens = $available_response->used_tokens;
 				}
 			}
+			$progress = isset($tokens) && $tokens ? floor( ( $used_tokens * 100 ) / $tokens ) : 0;
 		}
 
 
@@ -588,6 +592,30 @@ class Every_Alt_Admin {
 		);
 	}
 
+	/**
+	 * Save settings form (traditional POST).
+	 */
+	public function every_alt_save_settings() {
+		if ( ! isset( $_POST['everyalt_settings_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['everyalt_settings_nonce'] ) ), 'everyalt_save_settings' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( isset( $_POST[ $this->option_name . '_secret' ] ) ) {
+			update_option( $this->option_name . '_secret', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_secret' ] ) ) );
+		}
+		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
+		update_option( $this->option_name . '_fulltext', ! empty( $_POST[ $this->option_name . '_fulltext' ] ) ? 1 : 0 );
+		if ( isset( $_POST[ $this->option_name . '_httpuser' ] ) ) {
+			update_option( $this->option_name . '_httpuser', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpuser' ] ) ) );
+		}
+		if ( isset( $_POST[ $this->option_name . '_httpassword' ] ) ) {
+			update_option( $this->option_name . '_httpassword', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpassword' ] ) ) );
+		}
+		wp_safe_redirect( add_query_arg( array( 'page' => 'everyalt', 'tab' => 'settings', 'updated' => '1' ), admin_url( 'upload.php' ) ) );
+		exit;
+	}
 
 	public function every_alt_custom_admin_endpoints() {
         register_rest_route( 'everyalt-api/v1', '/get_tokens', array(
@@ -621,9 +649,9 @@ class Every_Alt_Admin {
 		
     }
 
-	public function bulk_generate_alt(){
-		$media_id = absint($_POST['media_id']);
-		$alt_text = $this->every_alt_auto_add_image_alt_text($media_id, true);
+	public function bulk_generate_alt( $request ) {
+		$media_id = absint( $request->get_param( 'media_id' ) );
+		$alt_text = $this->every_alt_auto_add_image_alt_text( $media_id, true );
 
 		
 		
@@ -648,10 +676,10 @@ class Every_Alt_Admin {
 		return new WP_REST_Response($response, 200);
 	}
 
-	public function every_alt_save_alt(){
-		$media_id = absint($_POST['media_id']);
-		$log_id = absint($_POST['log_id']);
-		$alt_text = sanitize_text_field($_POST['alt_text']);
+	public function every_alt_save_alt( $request ) {
+		$media_id = absint( $request->get_param( 'media_id' ) );
+		$log_id = absint( $request->get_param( 'log_id' ) );
+		$alt_text = sanitize_text_field( $request->get_param( 'alt_text' ) );
 		$update = update_post_meta( $media_id, '_wp_attachment_image_alt', $alt_text );
 		$response = [
 			'alt' => $alt_text,
