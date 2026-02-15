@@ -14,10 +14,14 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'history', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'history' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'History', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
 	</h2>
 
 <?php if ( isset( $_GET['updated'] ) && $_GET['updated'] === '1' ) : ?>
 	<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'everyalt' ); ?></p></div>
+<?php endif; ?>
+<?php if ( isset( $_GET['error'] ) && $_GET['error'] === 'everyalt_invalid_key' ) : ?>
+	<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'The OpenAI API key you entered could not be validated. Please check the key and try again. It was not saved.', 'everyalt' ); ?></p></div>
 <?php endif; ?>
 
 <?php if ( $active === 'settings' ) : ?>
@@ -27,10 +31,10 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 			<?php wp_nonce_field( 'everyalt_save_settings', 'everyalt_settings_nonce' ); ?>
 			<table class="form-table" role="presentation">
 				<tr>
-					<th scope="row"><label for="every_alt_secret"><?php esc_html_e( 'API Key', 'everyalt' ); ?></label></th>
+					<th scope="row"><label for="every_alt_openai_key"><?php esc_html_e( 'OpenAI API Key', 'everyalt' ); ?></label></th>
 					<td>
-						<input type="password" name="every_alt_secret" id="every_alt_secret" value="<?php echo esc_attr( get_option( 'every_alt_secret', '' ) ); ?>" class="regular-text" autocomplete="off">
-						<p class="description"><?php esc_html_e( 'Your EveryAlt API key from everyalt.com', 'everyalt' ); ?></p>
+						<input type="password" name="every_alt_openai_key" id="every_alt_openai_key" value="" class="regular-text" autocomplete="off" placeholder="<?php esc_attr_e( 'Leave blank to keep existing key', 'everyalt' ); ?>">
+						<p class="description"><?php esc_html_e( 'Your OpenAI API key. Alt text is generated via OpenAI (image is sent as base64, so it works on localhost and behind HTTP auth). Stored encrypted.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -40,22 +44,14 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</td>
 				</tr>
 				<tr>
-					<th scope="row"><?php esc_html_e( 'Full text', 'everyalt' ); ?></th>
+					<th scope="row"><label for="every_alt_vision_prompt"><?php esc_html_e( 'Alt text prompt', 'everyalt' ); ?></label></th>
 					<td>
-						<label><input type="checkbox" name="every_alt_fulltext" value="1" <?php checked( get_option( 'every_alt_fulltext', 0 ), 1 ); ?>><?php esc_html_e( 'Use full descriptive text for alt (if supported by your plan)', 'everyalt' ); ?></label>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="every_alt_httpuser"><?php esc_html_e( 'HTTP Auth Username', 'everyalt' ); ?></label></th>
-					<td>
-						<input type="text" name="every_alt_httpuser" id="every_alt_httpuser" value="<?php echo esc_attr( get_option( 'every_alt_httpuser', '' ) ); ?>" class="regular-text">
-						<p class="description"><?php esc_html_e( 'Optional: if your site is behind HTTP authentication', 'everyalt' ); ?></p>
-					</td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="every_alt_httpassword"><?php esc_html_e( 'HTTP Auth Password', 'everyalt' ); ?></label></th>
-					<td>
-						<input type="password" name="every_alt_httpassword" id="every_alt_httpassword" value="<?php echo esc_attr( get_option( 'every_alt_httpassword', '' ) ); ?>" class="regular-text" autocomplete="off">
+						<?php
+						$current_prompt = get_option( 'every_alt_vision_prompt', '' );
+						$placeholder    = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
+						?>
+						<textarea name="every_alt_vision_prompt" id="every_alt_vision_prompt" class="large-text" rows="4" placeholder="<?php echo esc_attr( $placeholder ); ?>"><?php echo esc_textarea( $current_prompt ); ?></textarea>
+						<p class="description"><?php esc_html_e( 'Instruction sent to the AI with each image. Leave blank to use the default prompt. The model should return only the alt text, no extra wording.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 			</table>
@@ -63,19 +59,6 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<?php submit_button( __( 'Save Settings', 'everyalt' ), 'primary', 'submit', false ); ?>
 			</p>
 		</form>
-		<?php if ( ! empty( $secret_key ) && isset( $tokens ) ) : ?>
-			<p>
-				<?php
-				printf(
-					/* translators: 1: used tokens, 2: total tokens */
-					esc_html__( 'Usage: %1$s of %2$s image quota used.', 'everyalt' ),
-					(int) $used_tokens,
-					(int) $tokens
-				);
-				?>
-				<a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Get More', 'everyalt' ); ?></a>
-			</p>
-		<?php endif; ?>
 	</div>
 <?php endif; ?>
 
@@ -87,29 +70,13 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<h2><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h2>
 		<?php if ( $error ) : ?>
 			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
-		<?php elseif ( ! empty( $secret_key ) ) : ?>
-			<p>
-				<?php
-				$progress_val = isset( $progress ) ? (int) $progress : 0;
-				$used_val = isset( $used_tokens ) ? (int) $used_tokens : 0;
-				$total_val = isset( $tokens ) ? (int) $tokens : 0;
-				printf(
-					/* translators: 1: progress percent, 2: used tokens, 3: total tokens */
-					esc_html__( '%1$s%% - You have used %2$s of %3$s image quota.', 'everyalt' ),
-					$progress_val,
-					$used_val,
-					$total_val
-				);
-				?>
-				<a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Get More', 'everyalt' ); ?></a>
-			</p>
+		<?php elseif ( $has_openai_key ) : ?>
 			<?php
 			$count = count( $bulk_image_ids );
 			if ( $count > 0 ) :
-				$insufficient = isset( $tokens, $used_tokens ) && ( (int) $tokens - (int) $used_tokens ) < $count;
 				?>
 				<p>
-					<button type="button" id="everyalt-bulk-run" class="button button-primary" data-ids="<?php echo esc_attr( wp_json_encode( array_values( $bulk_image_ids ) ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'every_alt_nonce' ) ); ?>" data-rest="<?php echo esc_attr( rest_url( 'everyalt-api/v1/bulk_generate_alt' ) ); ?>" <?php echo $insufficient ? ' disabled' : ''; ?>>
+					<button type="button" id="everyalt-bulk-run" class="button button-primary" data-ids="<?php echo esc_attr( wp_json_encode( array_values( $bulk_image_ids ) ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'every_alt_nonce' ) ); ?>" data-rest="<?php echo esc_attr( rest_url( 'everyalt-api/v1/bulk_generate_alt' ) ); ?>">
 						<?php
 						echo esc_html(
 							sprintf(
@@ -121,9 +88,6 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						?>
 					</button>
 				</p>
-				<?php if ( $insufficient ) : ?>
-					<p class="description"><?php esc_html_e( 'Your available tokens are not enough to complete the process.', 'everyalt' ); ?> <a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Get More', 'everyalt' ); ?></a></p>
-				<?php endif; ?>
 				<div id="everyalt-bulk-progress" class="everyalt-progress hidden">
 					<p><strong><?php esc_html_e( 'Processing… Don\'t close this window.', 'everyalt' ); ?></strong></p>
 				</div>
@@ -164,7 +128,63 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<?php endif; ?>
 			<?php endif; ?>
 		<?php else : ?>
-			<p><?php esc_html_e( 'Please enter your API key in the Settings tab first.', 'everyalt' ); ?></p>
+			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
+		<?php endif; ?>
+	</div>
+<?php endif; ?>
+
+<?php if ( $active === 'logs' ) : ?>
+	<div class="everyalt-logs-wrap">
+		<h2><?php esc_html_e( 'Generation Log', 'everyalt' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Last 100 alt text generation attempts (successes and failures).', 'everyalt' ); ?></p>
+		<?php if ( ! empty( $generation_log ) ) : ?>
+			<table class="wp-list-table widefat fixed striped">
+				<thead>
+					<tr>
+						<th style="width:140px"><?php esc_html_e( 'Time', 'everyalt' ); ?></th>
+						<th style="width:90px"><?php esc_html_e( 'Attachment', 'everyalt' ); ?></th>
+						<th style="width:80px"><?php esc_html_e( 'Status', 'everyalt' ); ?></th>
+						<th><?php esc_html_e( 'Message / Alt text', 'everyalt' ); ?></th>
+						<th><?php esc_html_e( 'Details', 'everyalt' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $generation_log as $entry ) : ?>
+						<tr>
+							<td><?php echo esc_html( $entry['time'] ); ?></td>
+							<td>
+								<?php
+								$aid = (int) $entry['attachment_id'];
+								if ( $aid ) {
+									$edit_link = get_edit_post_link( $aid );
+									if ( $edit_link ) {
+										echo '<a href="' . esc_url( $edit_link ) . '">#' . (int) $aid . '</a>';
+									} else {
+										echo '#' . (int) $aid;
+									}
+								} else {
+									echo '—';
+								}
+								?>
+							</td>
+							<td>
+								<?php
+								$status = isset( $entry['status'] ) ? $entry['status'] : '';
+								if ( $status === 'success' ) {
+									echo '<span style="color:green">' . esc_html__( 'Success', 'everyalt' ) . '</span>';
+								} else {
+									echo '<span style="color:#b32d2e">' . esc_html__( 'Error', 'everyalt' ) . '</span>';
+								}
+								?>
+							</td>
+							<td><?php echo esc_html( isset( $entry['message'] ) ? $entry['message'] : '' ); ?></td>
+							<td class="everyalt-log-detail" style="max-width:320px; overflow-wrap: break-word;"><?php echo esc_html( isset( $entry['detail'] ) ? $entry['detail'] : '' ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php else : ?>
+			<p><?php esc_html_e( 'No log entries yet. Generate alt text from the Bulk tab or when uploading images to populate this log.', 'everyalt' ); ?></p>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>

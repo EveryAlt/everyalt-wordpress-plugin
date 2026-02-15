@@ -33,7 +33,55 @@ class Every_Alt_Admin {
 
 	 private $option_name = 'every_alt';
 
-	 
+	const GENERATION_LOG_OPTION = 'every_alt_generation_log';
+	const GENERATION_LOG_MAX    = 100;
+
+	/**
+	 * Append an entry to the generation log (last 100 entries).
+	 *
+	 * @param int    $attachment_id
+	 * @param string $status   'success' or 'error'
+	 * @param string $message  Short message
+	 * @param string $detail   Optional longer detail (e.g. API error body)
+	 */
+	private function every_alt_add_generation_log( $attachment_id, $status, $message, $detail = '' ) {
+		$log   = get_option( self::GENERATION_LOG_OPTION, array() );
+		$entry = array(
+			'time'          => current_time( 'mysql' ),
+			'attachment_id' => (int) $attachment_id,
+			'status'        => $status,
+			'message'       => $message,
+			'detail'        => $detail,
+		);
+		array_unshift( $log, $entry );
+		$log = array_slice( $log, 0, self::GENERATION_LOG_MAX );
+		update_option( self::GENERATION_LOG_OPTION, $log );
+	}
+
+	/**
+	 * Get the last 100 generation log entries.
+	 *
+	 * @return array
+	 */
+	public function every_alt_get_generation_log() {
+		$log = get_option( self::GENERATION_LOG_OPTION, array() );
+		return is_array( $log ) ? $log : array();
+	}
+
+	/**
+	 * Get decrypted OpenAI API key (stored encrypted in DB).
+	 *
+	 * @return string
+	 */
+	private function get_openai_key() {
+		$encrypted = get_option( Every_Alt_Encryption::OPTION_KEY, '' );
+		if ( $encrypted === '' ) {
+			return '';
+		}
+		return Every_Alt_Encryption::decrypt( $encrypted );
+	}
+
+	
 	 
 
 	/**
@@ -209,71 +257,46 @@ class Every_Alt_Admin {
 		return $new_url;
 	}
 
-	//auto alt
-	public function every_alt_auto_add_image_alt_text($attachment_ID, $bulk = null){
-		// check if option is enanable and key is set
-		$secret_key = get_option( $this->option_name . '_secret' );
-		$auto = get_option( $this->option_name . '_auto' );
-		$add_full_text = get_option( $this->option_name . '_fulltext' );
-		if($bulk){
+	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
+	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null ) {
+		$api_key = $this->get_openai_key();
+		$auto    = get_option( $this->option_name . '_auto' );
+		if ( $bulk ) {
 			$auto = 1;
 		}
-		if(!$secret_key || !$auto){
-			return;
+		if ( ! $api_key || ! $auto ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: no API key or auto-generate disabled.', 'everyalt' ), '' );
+			return null;
 		}
-		//validate the token
-		$valid_token = $this->every_alt_validate_token();
-		if(!$valid_token){
-			return;
+		if ( ! $this->every_alt_validate_token() ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: API key validation failed.', 'everyalt' ), '' );
+			return null;
 		}
-
-		//lastly we check if is a valid image and less than 4mb
-		if(!$this->every_alt_is_valid_image($attachment_ID)){
-			return;
-		}
-
-		$url = wp_get_attachment_image_url($attachment_ID,'large');
-
-		//check password
-		$username = get_option( $this->option_name . '_httpuser' );
-		$password = get_option( $this->option_name . '_httpassword' );
-		if($username && $password){
-			$url = $this->add_http_auth_to_url($url, $username, $password);
+		if ( ! $this->every_alt_is_valid_image( $attachment_ID ) ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
+			return null;
 		}
 
+		$openai        = new Every_Alt_OpenAI( $api_key );
+		$generated_alt = $openai->generate_alt( $attachment_ID );
 
-		
-		
-
-
-		// $url = 'https://media-cldnry.s-nbcnews.com/image/upload/newscms/2020_04/3198231/200122-dinner-table-tacos-ac-831p.jpg';
-		
-		//check file size
-		$every_alt_curls = new Every_Alt_Curls($secret_key);
-		$generated_alt = $every_alt_curls->every_alt_generate_alt($url);
-		
-		if(!isset($generated_alt->alt) || !$generated_alt->alt){
-			return;
+		if ( ! empty( $generated_alt->error ) ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $generated_alt->error_detail );
+			return null;
+		}
+		if ( empty( $generated_alt->alt ) ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'No alt text returned from API.', 'everyalt' ), '' );
+			return null;
 		}
 
-		//add full text
-		if(isset($generated_alt->full_text) && $add_full_text){
-			$generated_alt->alt .=' Full Text: ' . $generated_alt->full_text;
-		}
+		update_post_meta( $attachment_ID, '_wp_attachment_image_alt', $generated_alt->alt );
+		$this->every_alt_media_logs( $generated_alt->alt, $attachment_ID );
+		$this->every_alt_add_generation_log( $attachment_ID, 'success', $generated_alt->alt, '' );
 
-		update_post_meta( $attachment_ID, '_wp_attachment_image_alt', sanitize_text_field($generated_alt->alt) );
-		//handle logs
-		$log = $this->every_alt_media_logs($generated_alt->alt,$attachment_ID);
-		
-		// handle bulk return
-		if($bulk){
+		if ( $bulk ) {
 			return $generated_alt;
-		}else{
-			return $generated_alt->alt;
 		}
-		
-		
-		
+		return $generated_alt->alt;
 	}
 
 	private function every_alt_is_valid_image($media_id) {
@@ -342,21 +365,9 @@ class Every_Alt_Admin {
 		return;
 	}
 
-	private function every_alt_validate_token(){
-		$secret_key = get_option( $this->option_name . '_secret' );
-		if(!$secret_key){
-			return false;
-		}
-		$every_alt_curls = new Every_Alt_Curls($secret_key);
-		$available_response = $every_alt_curls->every_alt_get_available_tokens();
-		if(isset($available_response->data->status) && $available_response->data->status > 200 ){
-			return false;
-		}
-		if(!isset($available_response->tokens) || $available_response->tokens < 0 ){
-			return false;
-		}
-		//tken his valid
-		return true;
+	private function every_alt_validate_token() {
+		$api_key = $this->get_openai_key();
+		return ! empty( $api_key );
 	}
 
 
@@ -481,56 +492,27 @@ class Every_Alt_Admin {
 		$active = $tab;
 		
 
-		$secret_key = get_option( $this->option_name . '_secret' );
-		$plugin_url = plugins_url('/', __DIR__);
-		$logo_url = $plugin_url . 'assets/everyalt-logo.png';
-
-		
-		if($active == 'settings'){
-			if($secret_key){
-				$every_alt_curls = new Every_Alt_Curls($secret_key);
-				$available_response = $every_alt_curls->every_alt_get_available_tokens();
-				$error = false;
-				if(isset($available_response->data->status) && $available_response->data->status > 200 ){
-					$this->error = $available_response->message;
-					$error = true;
-				}
-				if(!$error ){
-					$tokens = $available_response->tokens;
-					$used_tokens = $available_response->used_tokens;
-				}
-			}
-		}
+		$has_openai_key = ! empty( $this->get_openai_key() );
+		$plugin_url     = plugins_url( '/', __DIR__ );
+		$logo_url       = $plugin_url . 'assets/everyalt-logo.png';
 
 		if($active == 'history'){
 			$images = $this->every_alt_get_images();
 		}
 
 
-		if($active == 'bulk'){
+		if ( $active === 'bulk' ) {
 			$images_without_alt = $this->every_alt_get_images_without_alt();
-			$bulk_image_ids = wp_list_pluck($images_without_alt,'ID');
+			$bulk_image_ids = wp_list_pluck( $images_without_alt, 'ID' );
 			$history = $this->every_alt_get_images();
-
-			if($secret_key){
-				$every_alt_curls = new Every_Alt_Curls($secret_key);
-				$available_response = $every_alt_curls->every_alt_get_available_tokens();
-				$error = false;
-				if(isset($available_response->data->status) && $available_response->data->status > 200 ){
-					$error = $available_response->message;
-				}
-				if(!$error ){
-					$tokens = $available_response->tokens;
-					$used_tokens = $available_response->used_tokens;
-				}
-			}
-			$progress = isset($tokens) && $tokens ? floor( ( $used_tokens * 100 ) / $tokens ) : 0;
+			$tokens = null;
+			$used_tokens = null;
+			$progress = 0;
 		}
 
-
-
-		
-
+		if ( $active === 'logs' ) {
+			$generation_log = $this->every_alt_get_generation_log();
+		}
 
 		include_once 'partials/everyalt-options-display.php';
 	}
@@ -541,15 +523,7 @@ class Every_Alt_Admin {
 	
 
 	public function register_setting() {
-		register_setting(
-			$this->plugin_name,
-			$this->option_name . '_secret',
-				array(
-				'type'         => 'string',
-				'show_in_rest' => true,
-				'default'      => '',
-			)
-		);
+		// OpenAI key is stored encrypted via Every_Alt_Encryption::OPTION_KEY, not registered here.
 		register_setting(
 			$this->plugin_name,
 			$this->option_name . '_auto',
@@ -602,11 +576,22 @@ class Every_Alt_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		if ( isset( $_POST[ $this->option_name . '_secret' ] ) ) {
-			update_option( $this->option_name . '_secret', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_secret' ] ) ) );
+		$openai_key = isset( $_POST['every_alt_openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['every_alt_openai_key'] ) ) : '';
+		if ( $openai_key !== '' ) {
+			if ( ! Every_Alt_OpenAI::validate_api_key( $openai_key ) ) {
+				wp_safe_redirect( add_query_arg( array( 'page' => 'everyalt', 'tab' => 'settings', 'error' => 'everyalt_invalid_key' ), admin_url( 'upload.php' ) ) );
+				exit;
+			}
+			$encrypted = Every_Alt_Encryption::encrypt( $openai_key );
+			if ( $encrypted !== '' ) {
+				update_option( Every_Alt_Encryption::OPTION_KEY, $encrypted );
+			}
 		}
 		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
 		update_option( $this->option_name . '_fulltext', ! empty( $_POST[ $this->option_name . '_fulltext' ] ) ? 1 : 0 );
+		if ( isset( $_POST['every_alt_vision_prompt'] ) ) {
+			update_option( 'every_alt_vision_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_vision_prompt'] ) ) );
+		}
 		if ( isset( $_POST[ $this->option_name . '_httpuser' ] ) ) {
 			update_option( $this->option_name . '_httpuser', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpuser' ] ) ) );
 		}
@@ -655,25 +640,22 @@ class Every_Alt_Admin {
 
 		
 		
-		if(isset($alt_text->alt)){
-			$response = [
-				'media_id' => $media_id,
-				'alt_text' =>  $alt_text->alt,
-				'tokens' => $alt_text->tokens,
-				'used_tokens' => $alt_text->used_tokens,
-			];
-		}else{
-			$response = [
-				'media_id' => $media_id,
-				'alt_text' =>  false,
-				'tokens' => false,
-				'used_tokens' => false,
-			];
+		if ( $alt_text && isset( $alt_text->alt ) ) {
+			$response = array(
+				'media_id'     => $media_id,
+				'alt_text'     => $alt_text->alt,
+				'tokens'       => null,
+				'used_tokens'  => null,
+			);
+		} else {
+			$response = array(
+				'media_id'     => $media_id,
+				'alt_text'     => false,
+				'tokens'       => null,
+				'used_tokens'  => null,
+			);
 		}
-		
-		
-
-		return new WP_REST_Response($response, 200);
+		return new WP_REST_Response( $response, 200 );
 	}
 
 	public function every_alt_save_alt( $request ) {
@@ -690,73 +672,26 @@ class Every_Alt_Admin {
 		return new WP_REST_Response($response, 200);
 	}
 
-	private function is_user_authorized(){
-		$secret_key = get_option( $this->option_name . '_secret' );
-		//retutn
-		if(!$secret_key || empty($secret_key)){
-			return false;
-		}
-
-		$every_alt_curls = new Every_Alt_Curls($secret_key);
-		$available_response = $every_alt_curls->every_alt_get_available_tokens();
-		if(isset($available_response->data->status) && $available_response->data->status > 200 ){
-			return false;
-		}
-		if($available_response->tokens > $available_response->used_tokens){
-			return true;
-		}
-		return false;
+	private function is_user_authorized() {
+		return ! empty( $this->get_openai_key() );
 	}
 
 
-	public function every_alt_get_tokens(){
-
-		$secret_key = get_option( $this->option_name . '_secret' );
-		//retutn
-		if(!$secret_key || empty($secret_key)){
-			$response = [
-				'error' =>false,
-				'tokens' => false,
-				'used_tokens' => false,
-				'auto' => 0
-			];
-			return new WP_REST_Response($response, 200);
-		}
-		
-		if($secret_key && !empty($secret_key)){
-			$every_alt_curls = new Every_Alt_Curls($secret_key);
-			$available_response = $every_alt_curls->every_alt_get_available_tokens();
-			$error = false;
-			
-			if(isset($available_response->data->status) && $available_response->data->status > 200 ){
-				$error = $available_response->message;
-				update_option( $this->option_name . '_auto', 0 );
-			}
-
-			if(!$error ){
-				$tokens = $available_response->tokens;
-				$used_tokens = $available_response->used_tokens;
-				$progress = floor(($used_tokens*100)/$tokens);
-				//set auto to 1 only first time
-				if (get_option('every_alt_do_auto_default', false)) {
-					delete_option('every_alt_do_auto_default');
-					update_option( $this->option_name . '_auto', 1 );
-				}
+	public function every_alt_get_tokens() {
+		$has_key = ! empty( $this->get_openai_key() );
+		if ( get_option( 'every_alt_do_auto_default', false ) ) {
+			delete_option( 'every_alt_do_auto_default' );
+			if ( $has_key ) {
+				update_option( $this->option_name . '_auto', 1 );
 			}
 		}
-
-		
-
-		
-
-
-		$response = [
-			'error' => $error,
-			'tokens' => isset($tokens) ? $tokens : false,
-			'used_tokens' => isset($used_tokens) ? $used_tokens : false,
-			'auto' => get_option( $this->option_name . '_auto' )
-		];
-		return new WP_REST_Response($response, 200);
+		$response = array(
+			'error'        => false,
+			'tokens'       => null,
+			'used_tokens'  => null,
+			'auto'         => (int) get_option( $this->option_name . '_auto', 0 ),
+		);
+		return new WP_REST_Response( $response, 200 );
 	}
 
 	

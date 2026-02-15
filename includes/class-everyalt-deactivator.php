@@ -30,13 +30,13 @@ class Every_Alt_Deactivator {
 	 * @since    1.0.0
 	 */
 	public static function deactivate() {
-		//delete the options
-		delete_option('every_alt_secret');
-		delete_option('every_alt_auto');
-		delete_option('every_alt_fulltext');
-		delete_option('every_alt_httpuser');
-		delete_option('every_alt_httpassword');
-		delete_option('every_alt_do_auto_default');
+		delete_option( 'every_alt_secret' );
+		delete_option( 'every_alt_openai_key' );
+		delete_option( 'every_alt_auto' );
+		delete_option( 'every_alt_fulltext' );
+		delete_option( 'every_alt_httpuser' );
+		delete_option( 'every_alt_httpassword' );
+		delete_option( 'every_alt_do_auto_default' );
 	}
 
 }

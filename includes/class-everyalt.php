@@ -122,10 +122,8 @@ class Every_Alt {
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-everyalt-public.php';
 
-
-
-		//includes
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-curls.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-encryption.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-openai.php';
 
 
 		
