@@ -50,6 +50,8 @@ Works on localhost, behind HTTP auth, and with your existing workflow.
 
 ## 📦 Install
 
+**Download the latest release:** [Releases](https://github.com/EveryAlt/everyalt-wordpress-plugin/releases/) — grab the `.zip` for the version you want.
+
 1. **Upload** the plugin to `wp-content/plugins/everyalt` (or install via WordPress admin).
 2. **Activate** the plugin (Plugins → EveryAlt → Activate).
 3. **Open Media → EveryAlt** and add your [OpenAI API key](https://platform.openai.com/api-keys) in **Settings**.
@@ -78,7 +80,19 @@ That’s it. No account with us. No caps. No “upgrade to unlock more.”
 
 ## 🌐 Languages
 
-EveryAlt is translation-ready. Spanish (Español) is included; more languages welcome. The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages/`.
+EveryAlt is translation-ready. These languages are included:
+
+| Language | Locale |
+|----------|--------|
+| Spanish (Español) | es_ES |
+| Italian (Italiano) | it_IT |
+| Japanese (日本語) | ja |
+| French (Français) | fr_FR |
+| Brazilian Portuguese (Português do Brasil) | pt_BR |
+| German (Deutsch) | de_DE |
+| Dutch (Nederlands) | nl_NL |
+
+The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages/` so you can add or update translations.
 
 ---
 
