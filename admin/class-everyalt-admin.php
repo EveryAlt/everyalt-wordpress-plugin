@@ -76,7 +76,8 @@ class Every_Alt_Admin {
 	 * If CSV export was requested, send it and exit. Run on admin_init so headers are not yet sent.
 	 */
 	public function every_alt_maybe_export_logs_csv() {
-		if ( ! isset( $_GET['page'] ) || $_GET['page'] !== $this->plugin_name ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $page !== $this->plugin_name ) {
 			return;
 		}
 		if ( ! isset( $_GET['export_csv'] ) || ! isset( $_GET['_wpnonce'] ) ) {
@@ -223,7 +224,8 @@ class Every_Alt_Admin {
 	 */
 	public function enqueue_styles() {
 		// Only load our minimal admin CSS on plugin pages (no wp-components).
-		if ( isset( $_GET['page'] ) && $_GET['page'] === 'everyalt' ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $page === 'everyalt' ) {
 			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array(), $this->version, 'all' );
 		}
 	}
@@ -232,7 +234,8 @@ class Every_Alt_Admin {
 	 * Register the JavaScript for the admin area (simple UI, no Vue/React).
 	 */
 	public function enqueue_scripts() {
-		if ( isset( $_GET['page'] ) && $_GET['page'] === 'everyalt' ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $page === 'everyalt' ) {
 			wp_enqueue_script(
 				$this->plugin_name,
 				plugin_dir_url( __FILE__ ) . 'js/everyalt-admin-simple.js',
@@ -357,7 +360,12 @@ class Every_Alt_Admin {
 		if ( ! empty( $generated_alt->error ) ) {
 			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
 			$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
-			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $generated_alt->error_detail, $usage, $cost );
+			// Do not pass error_detail to log if it contains a server path (information disclosure).
+			$detail_for_log = $generated_alt->error_detail;
+			if ( $detail_for_log !== '' && ( strpos( $detail_for_log, '/' ) !== false || strpos( $detail_for_log, '\\' ) !== false ) ) {
+				$detail_for_log = '';
+			}
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $detail_for_log, $usage, $cost );
 			return null;
 		}
 		if ( empty( $generated_alt->alt ) ) {
@@ -455,16 +463,18 @@ class Every_Alt_Admin {
 	private function every_alt_get_images(){
 		global $wpdb;
 		// Set the current page number
-		$page_number = (isset($_REQUEST['paged'])) ? max(1, intval($_REQUEST['paged'])) : 1;
+		$page_number = isset( $_REQUEST['paged'] ) ? max( 1, absint( $_REQUEST['paged'] ) ) : 1;
 
-		// Set the number of items to show per page
 		$per_page = 35;
-		// Calculate the offset for the query based on the current page and number of items per page
-		$offset = ($page_number - 1) * $per_page;
-		// Get the total number of items in the table
-		$total_items = $wpdb->get_var("SELECT COUNT(*) FROM {$wpdb->prefix}every_alt_logs");
-		// Query the database for the items to display on the current page
-		$results = $wpdb->get_results("SELECT * FROM {$wpdb->prefix}every_alt_logs ORDER BY id DESC LIMIT $per_page OFFSET $offset");
+		$offset   = ( $page_number - 1 ) * $per_page;
+		$total_items = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}every_alt_logs" );
+		$results = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT * FROM {$wpdb->prefix}every_alt_logs ORDER BY id DESC LIMIT %d OFFSET %d",
+				$per_page,
+				$offset
+			)
+		);
 		
 		if(!$results){
 			$response = [
@@ -589,7 +599,8 @@ class Every_Alt_Admin {
 	 * @since  1.0.0
 	 */
 	public function display_options_page() {
-		$tab = isset($_GET['tab']) && !empty($_GET['tab']) ? $_GET['tab'] : 'settings';
+		$allowed_tabs = array( 'settings', 'bulk', 'review', 'logs' );
+		$tab = isset( $_GET['tab'] ) && in_array( $_GET['tab'], $allowed_tabs, true ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
 		$active = $tab;
 		
 
@@ -710,20 +721,47 @@ class Every_Alt_Admin {
 
 
 		register_rest_route( 'everyalt-api/v1', '/save_alt', array(
-			'methods' => WP_REST_Server::CREATABLE,
-            'callback' => [$this,'every_alt_save_alt'],
-            'permission_callback' => function () {
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( $this, 'every_alt_save_alt' ),
+			'permission_callback' => function () {
 				return current_user_can( 'manage_options' );
-			}
-        ));
+			},
+			'args'                => array(
+				'media_id' => array(
+					'required'          => true,
+					'type'              => 'integer',
+					'minimum'           => 1,
+					'sanitize_callback' => 'absint',
+				),
+				'log_id'   => array(
+					'required'          => false,
+					'type'              => 'integer',
+					'minimum'           => 0,
+					'sanitize_callback' => 'absint',
+				),
+				'alt_text' => array(
+					'required' => true,
+					'type'     => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		) );
 
 		register_rest_route( 'everyalt-api/v1', '/bulk_generate_alt', array(
-			'methods' => WP_REST_Server::CREATABLE,
-            'callback' => [$this,'bulk_generate_alt'],
-            'permission_callback' => function () {
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( $this, 'bulk_generate_alt' ),
+			'permission_callback' => function () {
 				return current_user_can( 'manage_options' );
-			}
-        ));
+			},
+			'args'                => array(
+				'media_id' => array(
+					'required'          => true,
+					'type'              => 'integer',
+					'minimum'           => 1,
+					'sanitize_callback' => 'absint',
+				),
+			),
+		) );
 
 
 

@@ -34,7 +34,7 @@ class Every_Alt_Activator {
 		$table_name = $wpdb->prefix . 'every_alt_logs';
 		$charset_collate = $wpdb->get_charset_collate();
 		// Check if the table already exists
-		if($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ) !== $table_name ) {
 			$sql = "CREATE TABLE $table_name (
 				id mediumint(9) NOT NULL AUTO_INCREMENT,
 				media_id mediumint(9) NOT NULL,
