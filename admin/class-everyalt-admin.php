@@ -548,7 +548,7 @@ class Every_Alt_Admin {
 	//settings link on plugin list page
 	function every_alt_settings_link( $links ) {
 		$url = get_admin_url().'upload.php?page=everyalt';
-		$settings_link = "<a href='$url'>" . __( 'Settings' ) . '</a>';
+		$settings_link = "<a href='$url'>" . __( 'Settings', 'everyalt' ) . '</a>';
 		array_push(
 			$links,
 			$settings_link
@@ -783,7 +783,7 @@ class Every_Alt_Admin {
 			'alt' => $alt_text,
 			'log_id' => $log_id,
 			'media_id' => $media_id,
-			'message' => __('Alt Succesfully Updated','everyalt'),
+			'message' => __( 'Alt successfully updated.', 'everyalt' ),
 		];
 		return new WP_REST_Response($response, 200);
 	}
