@@ -223,9 +223,21 @@ class Every_Alt_Admin {
 
 	//redirect after activation
 
-	// Gutenberg block editor: no longer adding React button (simple UI only).
+	/**
+	 * Enqueue Block Editor script: "Generate alt text with EveryAlt" for core/image block.
+	 */
 	public function add_custom_button_to_image_block() {
-		// Left empty – use Media Library or Bulk tab instead.
+		$asset_file = plugin_dir_path( __FILE__ ) . 'js/everyalt-gutenberg-button.js';
+		if ( ! file_exists( $asset_file ) ) {
+			return;
+		}
+		wp_enqueue_script(
+			$this->plugin_name . '-gutenberg-image',
+			plugin_dir_url( __FILE__ ) . 'js/everyalt-gutenberg-button.js',
+			array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-hooks', 'wp-api-fetch' ),
+			$this->version,
+			true
+		);
 	}
 
 
