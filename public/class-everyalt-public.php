@@ -3,11 +3,11 @@
 /**
  * The public-facing functionality of the plugin.
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/public
+ * @package    EveryAlt
+ * @subpackage EveryAlt/public
  */
 
 /**
@@ -16,9 +16,9 @@
  * Defines the plugin name, version, and two examples hooks for how to
  * enqueue the public-facing stylesheet and JavaScript.
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/public
- * @author     HDC <info@hdc.dev>
+ * @package    EveryAlt
+ * @subpackage EveryAlt/public
+ * @author     HDC <info@hdc.net>
  */
 class Every_Alt_Public {
 
@@ -60,21 +60,7 @@ class Every_Alt_Public {
 	 * @since    1.0.0
 	 */
 	public function enqueue_styles() {
-
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Every_Alt_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Every_Alt_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-public.css', array(), $this->version, 'all' );
-
+		// Public assets removed; plugin is admin-only. Re-add enqueue here if you add public CSS.
 	}
 
 	/**
@@ -83,21 +69,7 @@ class Every_Alt_Public {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
-
-		/**
-		 * This function is provided for demonstration purposes only.
-		 *
-		 * An instance of this class should be passed to the run() function
-		 * defined in Every_Alt_Loader as all of the hooks are defined
-		 * in that particular class.
-		 *
-		 * The Every_Alt_Loader will then create the relationship
-		 * between the defined hooks and the functions defined in this
-		 * class.
-		 */
-
-		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-public.js', array( 'jquery' ), $this->version, false );
-
+		// Public assets removed; plugin is admin-only. Re-add enqueue here if you add public JS.
 	}
 
 }

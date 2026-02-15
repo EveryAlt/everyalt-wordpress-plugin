@@ -5,11 +5,11 @@
  *
  * This file is used to markup the admin-facing aspects of the plugin.
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/admin/partials
+ * @package    EveryAlt
+ * @subpackage EveryAlt/admin/partials
  */
 ?>
 

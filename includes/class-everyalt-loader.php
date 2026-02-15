@@ -3,11 +3,11 @@
 /**
  * Register all actions and filters for the plugin
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
  */
 
 /**
@@ -17,9 +17,9 @@
  * the plugin, and register them with the WordPress API. Call the
  * run function to execute the list of actions and filters.
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
- * @author     HDC <info@hdc.dev>
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
+ * @author     HDC <info@hdc.net>
  */
 class Every_Alt_Loader {
 

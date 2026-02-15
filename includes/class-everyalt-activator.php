@@ -3,11 +3,11 @@
 /**
  * Fired during plugin activation
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
  */
 
 /**
@@ -16,9 +16,9 @@
  * This class defines all code necessary to run during the plugin's activation.
  *
  * @since      0.0.1
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
- * @author     HDC <info@hdc.dev>
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
+ * @author     HDC <info@hdc.net>
  */
 class Every_Alt_Activator {
 

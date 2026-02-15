@@ -2,8 +2,8 @@
 /**
  * Admin options display - simple WordPress UI (no Vue/React).
  *
- * @package Every_Alt
- * @subpackage Every_Alt/admin/partials
+ * @package EveryAlt
+ * @subpackage EveryAlt/admin/partials
  */
 $base_url = admin_url( 'upload.php?page=everyalt' );
 ?>

@@ -8,17 +8,17 @@
  * registers the activation and deactivation functions, and defines a function
  * that starts the plugin.
  *
- * @link              https://hdc.dev
+ * @link              https://hdc.net
  * @since             0.0.1
- * @package           Every_Alt
+ * @package           EveryAlt
  *
  * @wordpress-plugin
  * Plugin Name:       EveryAlt
  * Plugin URI:        https://everyalt.com
  * Description:       Instantly generate alternative text for all your images.
- * Version:           0.0.2
+ * Version:           1.0
  * Author:            HDC
- * Author URI:        https://workwithhdc.com
+ * Author URI:        https://hdc.net
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain:       everyalt
@@ -35,7 +35,7 @@ if ( ! defined( 'WPINC' ) ) {
  * Start at version 1.0.0 and use SemVer - https://semver.org
  * Rename this for your plugin and update it as you release new versions.
  */
-define( 'EVERY_ALT_VERSION', '0.0.2' );
+define( 'EVERY_ALT_VERSION', '1.0' );
 
 /**
  * The code that runs during plugin activation.

@@ -3,7 +3,7 @@
  * Generate alt text via OpenAI Vision API using image as base64 (medium size).
  * No third-party server; works for localhost and htpasswd-protected sites.
  *
- * @package Every_Alt
+ * @package EveryAlt
  */
 
 if ( ! defined( 'ABSPATH' ) ) {

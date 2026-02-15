@@ -19,10 +19,10 @@
  * For more information, see the following discussion:
  * https://github.com/tommcfarlin/WordPress-Plugin-Boilerplate/pull/123#issuecomment-28541913
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
+ * @package    EveryAlt
  */
 
 // If uninstall not called from WordPress, then exit.

@@ -6,11 +6,11 @@
  * A class definition that includes attributes and functions used across both the
  * public-facing side of the site and the admin area.
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
  */
 
 /**
@@ -23,9 +23,9 @@
  * version of the plugin.
  *
  * @since      0.0.1
- * @package    Every_Alt
- * @subpackage Every_Alt/includes
- * @author     HDC <info@hdc.dev>
+ * @package    EveryAlt
+ * @subpackage EveryAlt/includes
+ * @author     HDC <info@hdc.net>
  */
 class Every_Alt {
 

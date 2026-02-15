@@ -3,11 +3,11 @@
 /**
  * The admin-specific functionality of the plugin.
  *
- * @link       https://hdc.dev
+ * @link       https://hdc.net
  * @since      0.0.1
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/admin
+ * @package    EveryAlt
+ * @subpackage EveryAlt/admin
  */
 
 /**
@@ -16,9 +16,9 @@
  * Defines the plugin name, version, and two examples hooks for how to
  * enqueue the admin-specific stylesheet and JavaScript.
  *
- * @package    Every_Alt
- * @subpackage Every_Alt/admin
- * @author     HDC <info@hdc.dev>
+ * @package    EveryAlt
+ * @subpackage EveryAlt/admin
+ * @author     HDC <info@hdc.net>
  */
 class Every_Alt_Admin {
 
