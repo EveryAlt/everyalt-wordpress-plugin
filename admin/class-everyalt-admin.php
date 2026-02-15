@@ -271,7 +271,7 @@ class Every_Alt_Admin {
 	}
 
 
-	// Custom button on media edit page (simple WordPress UI).
+	// Custom button on media edit page (simple WordPress UI), at end of right sidebar (submit box).
 	public function every_alt_custom_button_to_media_edit_page() {
 		global $post;
 		if ( ! $post || ! $this->every_alt_is_valid_image( $post->ID ) || ! $this->is_user_authorized() ) {
@@ -325,6 +325,30 @@ class Every_Alt_Admin {
 		}
 	
 		return $new_url;
+	}
+
+	/**
+	 * When attachment metadata is updated (after upload, so medium size exists), run auto alt if enabled and alt is empty.
+	 *
+	 * @param int    $meta_id
+	 * @param int    $object_id
+	 * @param string $meta_key
+	 * @param mixed  $meta_value
+	 */
+	public function every_alt_maybe_auto_after_metadata( $meta_id, $object_id, $meta_key, $meta_value ) {
+		if ( $meta_key !== '_wp_attachment_metadata' || ! wp_attachment_is_image( $object_id ) ) {
+			return;
+		}
+		if ( ! is_array( $meta_value ) || empty( $meta_value['sizes'] ) ) {
+			return;
+		}
+		if ( get_post_meta( $object_id, '_wp_attachment_image_alt', true ) !== '' ) {
+			return;
+		}
+		if ( ! get_option( $this->option_name . '_auto' ) || ! $this->get_openai_key() ) {
+			return;
+		}
+		$this->every_alt_auto_add_image_alt_text( $object_id, false );
 	}
 
 	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
@@ -518,6 +542,28 @@ class Every_Alt_Admin {
 		return $images_without_alt;
 	}
 
+	/**
+	 * Get image attachments that already have alt text.
+	 *
+	 * @return array Array of WP_Post objects.
+	 */
+	private function every_alt_get_images_with_alt() {
+		$images = get_posts( array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'posts_per_page' => -1,
+			'post_status'    => 'any',
+		) );
+		$with_alt = array();
+		foreach ( $images as $image ) {
+			$alt = get_post_meta( $image->ID, '_wp_attachment_image_alt', true );
+			if ( $alt !== '' ) {
+				$with_alt[] = $image;
+			}
+		}
+		return $with_alt;
+	}
+
 	
 	//settings link on plugin list page
 	function every_alt_settings_link( $links ) {
@@ -579,11 +625,10 @@ class Every_Alt_Admin {
 
 		if ( $active === 'bulk' ) {
 			$images_without_alt = $this->every_alt_get_images_without_alt();
-			$bulk_image_ids = wp_list_pluck( $images_without_alt, 'ID' );
-			$history = $this->every_alt_get_images();
-			$tokens = null;
-			$used_tokens = null;
-			$progress = 0;
+		}
+
+		if ( $active === 'review' ) {
+			$images_with_alt = $this->every_alt_get_images_with_alt();
 		}
 
 		if ( $active === 'logs' ) {
@@ -716,26 +761,43 @@ class Every_Alt_Admin {
 
 	public function bulk_generate_alt( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
-		$alt_text = $this->every_alt_auto_add_image_alt_text( $media_id, true );
+		$result   = $this->every_alt_auto_add_image_alt_text( $media_id, true );
 
-		
-		
-		if ( $alt_text && isset( $alt_text->alt ) ) {
+		if ( $result && isset( $result->alt ) ) {
 			$response = array(
-				'media_id'     => $media_id,
-				'alt_text'     => $alt_text->alt,
-				'tokens'       => null,
-				'used_tokens'  => null,
+				'media_id' => $media_id,
+				'success'  => true,
+				'alt_text' => $result->alt,
 			);
 		} else {
-			$response = array(
-				'media_id'     => $media_id,
-				'alt_text'     => false,
-				'tokens'       => null,
-				'used_tokens'  => null,
+			$last_error = $this->every_alt_get_last_log_message_for_attachment( $media_id );
+			$response   = array(
+				'media_id' => $media_id,
+				'success'  => false,
+				'alt_text' => null,
+				'message'  => $last_error ? $last_error : __( 'Generation failed.', 'everyalt' ),
 			);
 		}
 		return new WP_REST_Response( $response, 200 );
+	}
+
+	/**
+	 * Get the message from the most recent generation log entry for an attachment.
+	 *
+	 * @param int $attachment_id
+	 * @return string Empty string if none.
+	 */
+	private function every_alt_get_last_log_message_for_attachment( $attachment_id ) {
+		$log = get_option( self::GENERATION_LOG_OPTION, array() );
+		if ( ! is_array( $log ) ) {
+			return '';
+		}
+		foreach ( $log as $entry ) {
+			if ( isset( $entry['attachment_id'] ) && (int) $entry['attachment_id'] === (int) $attachment_id ) {
+				return isset( $entry['message'] ) ? $entry['message'] : '';
+			}
+		}
+		return '';
 	}
 
 	public function every_alt_save_alt( $request ) {

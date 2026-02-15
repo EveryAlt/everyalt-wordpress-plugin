@@ -44,15 +44,16 @@
 			})
 			.then(function(data) {
 				btn.disabled = false;
-				if (data.alt_text) {
+				var success = data && data.success && data.alt_text;
+				if (success) {
 					msg.textContent = 'Alt text generated.';
 					msg.className = 'everyalt-media-message notice notice-success';
-					var altField = document.getElementById('attachment_alt');
+					var altField = document.getElementById('attachment_alt') || document.querySelector('textarea[name*="_wp_attachment_image_alt"]') || document.querySelector('input[name*="_wp_attachment_image_alt"]');
 					if (altField) {
 						altField.value = data.alt_text;
 					}
 				} else {
-					msg.textContent = 'Could not generate alt text.';
+					msg.textContent = (data && data.message) ? data.message : 'Could not generate alt text.';
 					msg.className = 'everyalt-media-message notice notice-error';
 				}
 			})

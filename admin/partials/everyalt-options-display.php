@@ -13,6 +13,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<h2 class="nav-tab-wrapper wp-clearfix" aria-label="<?php esc_attr_e( 'Secondary menu', 'everyalt' ); ?>">
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'review', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'review' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
 	</h2>
 
@@ -97,67 +98,77 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	?>
 	<div class="everyalt-bulk-wrap">
 		<h2><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h2>
+		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds all images in your media library that do not currently have alt text and lets you generate new alt text with EveryAlt quickly. To see existing images that already have alt text, go to the <a href="%s">Review Alt Text</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review', $base_url ) ) ) ); ?></p>
 		<?php if ( $error ) : ?>
 			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
-		<?php elseif ( $has_openai_key ) : ?>
-			<?php
-			$count = count( $bulk_image_ids );
-			if ( $count > 0 ) :
-				?>
-				<p>
-					<button type="button" id="everyalt-bulk-run" class="button button-primary" data-ids="<?php echo esc_attr( wp_json_encode( array_values( $bulk_image_ids ) ) ); ?>" data-nonce="<?php echo esc_attr( wp_create_nonce( 'every_alt_nonce' ) ); ?>" data-rest="<?php echo esc_attr( rest_url( 'everyalt-api/v1/bulk_generate_alt' ) ); ?>">
-						<?php
-						echo esc_html(
-							sprintf(
-								/* translators: %d: number of images */
-								_n( 'Automatically Add Alt Text for %d Image', 'Automatically Add Alt Text for %d Images', $count, 'everyalt' ),
-								$count
-							)
-						);
-						?>
-					</button>
-				</p>
-				<div id="everyalt-bulk-progress" class="everyalt-progress hidden">
-					<p><strong><?php esc_html_e( 'Processing… Don\'t close this window.', 'everyalt' ); ?></strong></p>
-				</div>
-			<?php else : ?>
-				<p><?php esc_html_e( 'No images without alt text found.', 'everyalt' ); ?></p>
-			<?php endif; ?>
-
-			<?php if ( ! empty( $history['images'] ) ) : ?>
-				<h2><?php esc_html_e( 'Alt generated so far', 'everyalt' ); ?></h2>
-				<table class="wp-list-table widefat fixed striped">
-					<thead>
-						<tr>
-							<th><?php esc_html_e( 'Image', 'everyalt' ); ?></th>
-							<th><?php esc_html_e( 'Alt text', 'everyalt' ); ?></th>
-							<th style="width:100px"><?php esc_html_e( 'Actions', 'everyalt' ); ?></th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ( $history['images'] as $item ) : ?>
-							<tr data-media-id="<?php echo (int) $item['media_id']; ?>" data-log-id="<?php echo (int) $item['id']; ?>">
-								<td>
-									<a href="<?php echo esc_url( $item['media_link'] ); ?>"><?php echo wp_get_attachment_image( $item['media_id'], 'thumbnail' ); ?></a>
-								</td>
-								<td>
-									<textarea class="everyalt-alt-field large-text" rows="3" data-media-id="<?php echo (int) $item['media_id']; ?>" data-log-id="<?php echo (int) $item['id']; ?>"><?php echo esc_textarea( $item['alt_text'] ); ?></textarea>
-								</td>
-								<td>
-									<button type="button" class="button everyalt-save-alt" data-nonce="<?php echo esc_attr( wp_create_nonce( 'every_alt_nonce' ) ); ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
-								</td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-				<?php if ( ! empty( $history['pagination'] ) ) : ?>
-					<div class="tablenav bottom">
-						<div class="tablenav-pages"><?php echo $history['pagination']; ?></div>
-					</div>
-				<?php endif; ?>
-			<?php endif; ?>
-		<?php else : ?>
+		<?php elseif ( ! $has_openai_key ) : ?>
 			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
+		<?php elseif ( empty( $images_without_alt ) ) : ?>
+			<p><?php esc_html_e( 'No images without alt text found.', 'everyalt' ); ?></p>
+		<?php else : ?>
+			<p class="everyalt-bulk-actions">
+				<button type="button" id="everyalt-bulk-select-all" class="button"><?php esc_html_e( 'Select all', 'everyalt' ); ?></button>
+				<button type="button" id="everyalt-bulk-select-none" class="button"><?php esc_html_e( 'Select none', 'everyalt' ); ?></button>
+				<button type="button" id="everyalt-bulk-run" class="button button-primary"><?php esc_html_e( 'Generate alt text for selected', 'everyalt' ); ?></button>
+			</p>
+			<div id="everyalt-bulk-progress" class="everyalt-bulk-progress hidden">
+				<p class="everyalt-bulk-progress-status"><strong><?php esc_html_e( 'Processing…', 'everyalt' ); ?></strong> <span id="everyalt-bulk-progress-text">0 / 0</span></p>
+				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-progress-fill"></span></div>
+				<ul id="everyalt-bulk-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
+			</div>
+			<ul class="everyalt-bulk-grid" id="everyalt-bulk-grid">
+				<?php foreach ( $images_without_alt as $image ) :
+					$aid = (int) $image->ID;
+					?>
+					<li class="everyalt-bulk-item" data-media-id="<?php echo $aid; ?>">
+						<label>
+							<input type="checkbox" class="everyalt-bulk-checkbox" value="<?php echo $aid; ?>">
+							<span class="everyalt-bulk-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
+						</label>
+						<?php
+						$edit_link = get_edit_post_link( $aid, 'raw' );
+						if ( $edit_link ) :
+							?>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+						<?php endif; ?>
+						<span class="everyalt-bulk-item-status" aria-live="polite"></span>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		<?php endif; ?>
+	</div>
+<?php endif; ?>
+
+<?php if ( $active === 'review' ) : ?>
+	<div class="everyalt-review-wrap">
+		<h2><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Images that already have alt text. Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_openai_key ) : ?>
+			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
+		<?php endif; ?>
+		<?php if ( empty( $images_with_alt ) ) : ?>
+			<p><?php esc_html_e( 'No images with alt text found.', 'everyalt' ); ?></p>
+		<?php else : ?>
+			<ul class="everyalt-review-grid" id="everyalt-review-grid">
+				<?php foreach ( $images_with_alt as $image ) :
+					$aid = (int) $image->ID;
+					$alt = get_post_meta( $aid, '_wp_attachment_image_alt', true );
+					$edit_link = get_edit_post_link( $aid, 'raw' );
+					?>
+					<li class="everyalt-review-item" data-media-id="<?php echo $aid; ?>">
+						<span class="everyalt-review-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
+						<?php if ( $edit_link ) : ?>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+						<?php endif; ?>
+						<textarea class="everyalt-review-alt-field" rows="3" data-media-id="<?php echo $aid; ?>"><?php echo esc_textarea( $alt ); ?></textarea>
+						<div class="everyalt-review-actions">
+							<button type="button" class="button everyalt-review-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
+							<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+						</div>
+						<span class="everyalt-review-status" aria-live="polite"></span>
+					</li>
+				<?php endforeach; ?>
+			</ul>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>

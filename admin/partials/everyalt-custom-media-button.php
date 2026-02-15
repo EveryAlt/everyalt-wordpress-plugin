@@ -6,6 +6,6 @@
  * @subpackage Every_Alt/admin/partials
  */
 ?>
-<div id="everyalt-custom-media-button" class="everyalt-media-button-wrap" style="margin-top:12px;">
+<div id="everyalt-custom-media-button" class="everyalt-media-button-wrap" style="margin-top:12px;padding-left:12px;padding-right:12px;">
 	<!-- Button and message injected by everyalt-media-simple.js -->
 </div>

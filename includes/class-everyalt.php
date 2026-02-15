@@ -178,14 +178,13 @@ class Every_Alt {
 		$this->loader->add_action( 'wp_ajax_everyalt_validate_key', $plugin_admin, 'ajax_validate_key' );
 
 		
-		//auto
-		$this->loader->add_action( 'add_attachment', $plugin_admin, 'every_alt_auto_add_image_alt_text' );
+		//auto: run after attachment metadata (and medium size) is saved, not on add_attachment
+		$this->loader->add_action( 'updated_post_meta', $plugin_admin, 'every_alt_maybe_auto_after_metadata', 10, 4 );
 
 		//delete logs
 		$this->loader->add_action('delete_attachment', $plugin_admin, 'every_alt_on_media_delete');
 
-		//add alt from media page
-		// $this->loader->add_filter('media_row_actions', 'every_alt_custom_button_to_media_edit_page', 10, 2);
+		//add alt from media page (button at end of right sidebar)
 		$this->loader->add_action('attachment_submitbox_misc_actions', $plugin_admin, 'every_alt_custom_button_to_media_edit_page');
 
 
