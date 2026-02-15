@@ -286,31 +286,6 @@ class Every_Alt_Admin {
 
 	
 
-	//notices
-	public function every_alt_add_admin_notice(){
-		if(!$secret_key){
-			return;
-		}
-		$notice_message = __( 'EveryAlt Settings', 'everyalt' );
-		// Display the notice using WordPress's built-in admin_notice hook
-		add_action( 'admin_notices', function() use ( $notice_message ) {
-			echo '<div class="notice notice-info"><p>' . esc_html( $notice_message ) . '</p></div>';
-		});
-	}
-
-	//ajax bulk images
-	public function every_alt_generate_alt_image(){
-		check_ajax_referer( 'every_alt_nonce', 'nonce' );
-		$media_id = absint($_POST['media_id']);
-		$alt = $this->every_alt_auto_add_image_alt_text($media_id,true);
-		$response = [
-			'alt' => $alt,
-			'media_id' => $media_id
-		];
-		wp_send_json_success($response);
-	}
-
-
 	// Custom button on media edit page (simple WordPress UI), at end of right sidebar (submit box).
 	public function every_alt_custom_button_to_media_edit_page() {
 		global $post;
@@ -330,41 +305,6 @@ class Every_Alt_Admin {
 			'mediaId'   => (int) $post->ID,
 		) );
 		include_once 'partials/everyalt-custom-media-button.php';
-	}
-
-	//add username and password
-	private function add_http_auth_to_url($url, $username, $password) {
-		// Parse the URL
-		$parsed_url = parse_url($url);
-	
-		// Add the HTTP username and password to the URL
-		$parsed_url['user'] = $username;
-		$parsed_url['pass'] = $password;
-	
-		// Rebuild the URL
-		$new_url = $parsed_url['scheme'] . '://';
-		if (!empty($parsed_url['user'])) {
-			$new_url .= urlencode($parsed_url['user']);
-			if (!empty($parsed_url['pass'])) {
-				$new_url .= ':' . urlencode($parsed_url['pass']);
-			}
-			$new_url .= '@';
-		}
-		$new_url .= $parsed_url['host'];
-		if (!empty($parsed_url['port'])) {
-			$new_url .= ':' . $parsed_url['port'];
-		}
-		if (!empty($parsed_url['path'])) {
-			$new_url .= $parsed_url['path'];
-		}
-		if (!empty($parsed_url['query'])) {
-			$new_url .= '?' . $parsed_url['query'];
-		}
-		if (!empty($parsed_url['fragment'])) {
-			$new_url .= '#' . $parsed_url['fragment'];
-		}
-	
-		return $new_url;
 	}
 
 	/**

@@ -70,7 +70,7 @@ class Every_Alt {
 		if ( defined( 'EVERY_ALT_VERSION' ) ) {
 			$this->version = EVERY_ALT_VERSION;
 		} else {
-			$this->version = '1.0.0';
+			$this->version = '1.0';
 		}
 		$this->plugin_name = 'everyalt';
 
@@ -89,7 +89,6 @@ class Every_Alt {
 	 * - Every_Alt_Loader. Orchestrates the hooks of the plugin.
 	 * - Every_Alt_i18n. Defines internationalization functionality.
 	 * - Every_Alt_Admin. Defines all hooks for the admin area.
-	 * - Every_Alt_Public. Defines all hooks for the public side of the site.
 	 *
 	 * Create an instance of the loader which will be used to register the hooks
 	 * with WordPress.
@@ -116,17 +115,9 @@ class Every_Alt {
 		 */
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-admin.php';
 
-		/**
-		 * The class responsible for defining all actions that occur in the public-facing
-		 * side of the site.
-		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-everyalt-public.php';
-
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-encryption.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-openai.php';
 
-
-		
 		$this->loader = new Every_Alt_Loader();
 
 	}
@@ -164,21 +155,13 @@ class Every_Alt {
 
 		//settings
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'add_options_page' );
-
-
-		
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'register_setting' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_save_settings' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_maybe_export_logs_csv', 5 );
 		$this->loader->add_action( 'rest_api_init', $plugin_admin, 'register_setting' );
 		$this->loader->add_action( 'rest_api_init', $plugin_admin,'every_alt_custom_admin_endpoints' );
-
-
-		//ajax
-		// $this->loader->add_action( 'wp_ajax_every_alt_generate_alt_image', $plugin_admin, 'every_alt_generate_alt_image' );
 		$this->loader->add_action( 'wp_ajax_everyalt_validate_key', $plugin_admin, 'ajax_validate_key' );
 
-		
 		//auto: run after attachment metadata (and medium size) is saved, not on add_attachment
 		$this->loader->add_action( 'updated_post_meta', $plugin_admin, 'every_alt_maybe_auto_after_metadata', 10, 4 );
 
@@ -198,10 +181,6 @@ class Every_Alt {
 		//redirect after activation
 		$this->loader->add_action('admin_init', $plugin_admin, 'every_alt_plugin_redirect');
 
-		//notice
-		// $this->loader->add_action( 'admin_init', $plugin_admin,'every_alt_add_admin_notice' );
-
-
 		$this->loader->add_action( 'enqueue_block_editor_assets', $plugin_admin,'add_custom_button_to_image_block' );
 
 
@@ -215,12 +194,7 @@ class Every_Alt {
 	 * @access   private
 	 */
 	private function define_public_hooks() {
-
-		// $plugin_public = new Every_Alt_Public( $this->get_plugin_name(), $this->get_version() );
-
-		// $this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_styles' );
-		// $this->loader->add_action( 'wp_enqueue_scripts', $plugin_public, 'enqueue_scripts' );
-
+		// Public-facing hooks can be registered here if needed.
 	}
 
 	/**
@@ -241,16 +215,6 @@ class Every_Alt {
 	 */
 	public function get_plugin_name() {
 		return $this->plugin_name;
-	}
-
-	/**
-	 * The reference to the class that orchestrates the hooks with the plugin.
-	 *
-	 * @since     1.0.0
-	 * @return    Every_Alt_Loader    Orchestrates the hooks of the plugin.
-	 */
-	public function get_loader() {
-		return $this->loader;
 	}
 
 	/**
