@@ -79,7 +79,7 @@ class Every_Alt_Admin {
 	 */
 	public function enqueue_styles() {
 
-		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/every-alt-admin.css', array('wp-components'), $this->version, 'all' );
+		wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array('wp-components'), $this->version, 'all' );
 	
 	}
 
@@ -89,19 +89,19 @@ class Every_Alt_Admin {
 	 * @since    1.0.0
 	 */
 	public function enqueue_scripts() {
-		if(isset($_GET['page']) && $_GET['page'] == 'every-alt'){
+		if(isset($_GET['page']) && $_GET['page'] == 'everyalt'){
 			$tab = isset($_GET['tab']) && !empty($_GET['tab']) ? $_GET['tab'] : 'settings';
 			switch ($tab) {
 				case 'settings':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/every-alt-admin.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
+					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-admin.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
 				break;
 
 				case 'bulk':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/every-alt-bulk.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
+					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-bulk.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
 				break;
 
 				case 'history':
-					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/every-alt-history.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
+					wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-history.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
 				break;
 				
 				default:
@@ -115,7 +115,7 @@ class Every_Alt_Admin {
 
 	//block
 	public function add_custom_button_to_image_block(){
-		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/every-alt-gutenberg-button.js', array( 'wp-blocks', 'wp-components', 'wp-compose', 'wp-plugins', 'wp-edit-post','wp-data' ), $this->version, true );
+		wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-gutenberg-button.js', array( 'wp-blocks', 'wp-components', 'wp-compose', 'wp-plugins', 'wp-edit-post','wp-data' ), $this->version, true );
 	}
 
 
@@ -124,7 +124,7 @@ class Every_Alt_Admin {
 			delete_option('every_alt_do_activation_redirect');
 			if(!isset($_GET['activate-multi']))
 			{
-				wp_safe_redirect(admin_url( 'upload.php?page=every-alt&tab=settings' ));
+				wp_safe_redirect(admin_url( 'upload.php?page=everyalt&tab=settings' ));
 				exit();
 			}
 		}
@@ -141,7 +141,7 @@ class Every_Alt_Admin {
 		if(!$secret_key){
 			return;
 		}
-		$notice_message = __( 'EveryAlt Settings', 'every-alt' );
+		$notice_message = __( 'EveryAlt Settings', 'everyalt' );
 		// Display the notice using WordPress's built-in admin_notice hook
 		add_action( 'admin_notices', function() use ( $notice_message ) {
 			echo '<div class="notice notice-info"><p>' . esc_html( $notice_message ) . '</p></div>';
@@ -166,8 +166,8 @@ class Every_Alt_Admin {
 		
 		global $post;
 		if($this->every_alt_is_valid_image($post->ID) && $this->is_user_authorized()){
-			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/every-alt-media-button.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
-			include_once 'partials/every-alt-custom-media-button.php';
+			wp_enqueue_script( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'js/everyalt-media-button.js', array( 'wp-api', 'wp-i18n', 'wp-components', 'wp-element' , 'wp-data' , 'wp-notices' ), $this->version, true );
+			include_once 'partials/everyalt-custom-media-button.php';
 		}
 
 	}
@@ -432,7 +432,7 @@ class Every_Alt_Admin {
 	
 	//settings link on plugin list page
 	function every_alt_settings_link( $links ) {
-		$url = get_admin_url().'upload.php?page=every-alt';
+		$url = get_admin_url().'upload.php?page=everyalt';
 		$settings_link = "<a href='$url'>" . __( 'Settings' ) . '</a>';
 		array_push(
 			$links,
@@ -452,8 +452,8 @@ class Every_Alt_Admin {
 		
 		
 		$this->plugin_screen_hook_suffix = add_media_page(
-			__( 'EveryAlt', 'every-alt' ),
-			__( 'EveryAlt', 'every-alt' ),
+			__( 'EveryAlt', 'everyalt' ),
+			__( 'EveryAlt', 'everyalt' ),
 			'manage_options',
 			$this->plugin_name,
 			array( $this, 'display_options_page' )
@@ -481,7 +481,7 @@ class Every_Alt_Admin {
 
 		$secret_key = get_option( $this->option_name . '_secret' );
 		$plugin_url = plugins_url('/', __DIR__);
-		$logo_url = $plugin_url . 'assets/every-alt-logo.png';
+		$logo_url = $plugin_url . 'assets/everyalt-logo.png';
 
 		
 		if($active == 'settings'){
@@ -528,7 +528,7 @@ class Every_Alt_Admin {
 		
 
 
-		include_once 'partials/every-alt-options-display.php';
+		include_once 'partials/everyalt-options-display.php';
 	}
 
 	
@@ -590,7 +590,7 @@ class Every_Alt_Admin {
 
 
 	public function every_alt_custom_admin_endpoints() {
-        register_rest_route( 'every-alt-api/v1', '/get_tokens', array(
+        register_rest_route( 'everyalt-api/v1', '/get_tokens', array(
 			'methods' => WP_REST_Server::READABLE,
             'callback' => [$this,'every_alt_get_tokens'],
             'permission_callback' => function () {
@@ -599,7 +599,7 @@ class Every_Alt_Admin {
         ));
 
 
-		register_rest_route( 'every-alt-api/v1', '/save_alt', array(
+		register_rest_route( 'everyalt-api/v1', '/save_alt', array(
 			'methods' => WP_REST_Server::CREATABLE,
             'callback' => [$this,'every_alt_save_alt'],
             'permission_callback' => function () {
@@ -607,7 +607,7 @@ class Every_Alt_Admin {
 			}
         ));
 
-		register_rest_route( 'every-alt-api/v1', '/bulk_generate_alt', array(
+		register_rest_route( 'everyalt-api/v1', '/bulk_generate_alt', array(
 			'methods' => WP_REST_Server::CREATABLE,
             'callback' => [$this,'bulk_generate_alt'],
             'permission_callback' => function () {
@@ -657,7 +657,7 @@ class Every_Alt_Admin {
 			'alt' => $alt_text,
 			'log_id' => $log_id,
 			'media_id' => $media_id,
-			'message' => __('Alt Succesfully Updated','every-alt'),
+			'message' => __('Alt Succesfully Updated','everyalt'),
 		];
 		return new WP_REST_Response($response, 200);
 	}

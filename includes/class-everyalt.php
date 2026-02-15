@@ -72,7 +72,7 @@ class Every_Alt {
 		} else {
 			$this->version = '1.0.0';
 		}
-		$this->plugin_name = 'every-alt';
+		$this->plugin_name = 'everyalt';
 
 		$this->load_dependencies();
 		$this->set_locale();
@@ -103,29 +103,29 @@ class Every_Alt {
 		 * The class responsible for orchestrating the actions and filters of the
 		 * core plugin.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-every-alt-loader.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-loader.php';
 
 		/**
 		 * The class responsible for defining internationalization functionality
 		 * of the plugin.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-every-alt-i18n.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-i18n.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the admin area.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-every-alt-admin.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-admin.php';
 
 		/**
 		 * The class responsible for defining all actions that occur in the public-facing
 		 * side of the site.
 		 */
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-every-alt-public.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-everyalt-public.php';
 
 
 
 		//includes
-		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-every-alt-curls.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-curls.php';
 
 
 		
@@ -191,7 +191,7 @@ class Every_Alt {
 
 
 		//settings link
-		$this->loader->add_filter( 'plugin_action_links_'.$this->plugin_name.'/every-alt.php', $plugin_admin,'every_alt_settings_link' );
+		$this->loader->add_filter( 'plugin_action_links_'.$this->plugin_name.'/everyalt.php', $plugin_admin,'every_alt_settings_link' );
 
 
 

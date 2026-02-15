@@ -14,14 +14,14 @@
 ?>
 
 <!-- This file should primarily consist of HTML with a little bit of PHP. -->
-<div class="wrap" id="every-alt-tools-page">
+<div class="wrap" id="everyalt-tools-page">
 
 	<div class="every_alt_tools_header">
 		<h1><?php echo esc_html( get_admin_page_title() ); ?></h1>
 		<?php if($secret_key && !$error):?>
 		<p style="margin-bottom:0.25rem">
-			<span id="every_alt_counter_percent"><?php echo $progress ?></span>% - <?php _e( 'You have used', 'every-alt' )?> <span id="every_alt_counter_total"><?php echo $used_tokens ?></span> <?php _e( 'of your', 'every-alt' )?> <span id="every_alt_counter_avilable"><?php echo $tokens ?></span>-<?php _e( 'image quota', 'every-alt' )?>
-			<a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php _e( 'Get More', 'every-alt' )?></a>
+			<span id="every_alt_counter_percent"><?php echo $progress ?></span>% - <?php _e( 'You have used', 'everyalt' )?> <span id="every_alt_counter_total"><?php echo $used_tokens ?></span> <?php _e( 'of your', 'everyalt' )?> <span id="every_alt_counter_avilable"><?php echo $tokens ?></span>-<?php _e( 'image quota', 'everyalt' )?>
+			<a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php _e( 'Get More', 'everyalt' )?></a>
 		</p>
 		<div class="every_alt_counter_bar">
 			<div class="every_alt_counter_bar_progress" style="width:<?php echo $progress ?>%"></div>
@@ -35,15 +35,15 @@
 				id="every_alt_bulk_alt_images" 
 				class="button button-primary" 
 				type="button">
-				<?php _e( 'Automatically Add Alt Text for', 'every-alt' )?> <?php echo count($images_without_alt) ?> <?php echo count($images_without_alt) > 1 ? __( 'Images', 'every-alt' ):__( 'Image', 'every-alt' ) ?>
+				<?php _e( 'Automatically Add Alt Text for', 'everyalt' )?> <?php echo count($images_without_alt) ?> <?php echo count($images_without_alt) > 1 ? __( 'Images', 'everyalt' ):__( 'Image', 'everyalt' ) ?>
 				</button>
 				<?php if(($tokens - $used_tokens) < count($images_without_alt)):?>
-					<p class="error"><strong><?php _e( 'ATTENTION', 'every-alt' )?></strong>: <?php _e( 'Your available tokens are not enough to complete the process.', 'every-alt' )?> - <a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php _e( 'Get More', 'every-alt' )?></a></p>
+					<p class="error"><strong><?php _e( 'ATTENTION', 'everyalt' )?></strong>: <?php _e( 'Your available tokens are not enough to complete the process.', 'everyalt' )?> - <a href="https://everyalt.com" target="_blank" rel="noopener noreferrer"><?php _e( 'Get More', 'everyalt' )?></a></p>
 				<?php endif?>
 			</div>
 			<div id="every_alt_process_spinner" class="hidden">
 				<img src="<?php echo esc_url( includes_url() . 'js/tinymce/skins/lightgray/img//loader.gif' ); ?>" />
-				<p style="margin:0; margin-left:0.25rem"><strong><?php _e( 'Processing... Don\'t close this window', 'every-alt' )?></strong></p>
+				<p style="margin:0; margin-left:0.25rem"><strong><?php _e( 'Processing... Don\'t close this window', 'everyalt' )?></strong></p>
 			</div>
 			<div id="every_alt_progress_bar" class="hidden">
 				<div id="every_altprogress_bar_progress"></div>
@@ -54,7 +54,7 @@
 	<?php if(count($images['images'])):?>
 		
 		<div id="every_alt_images_generated">
-			<h3><?php _e( 'Alt Generated so Far', 'every-alt' )?> </h3>
+			<h3><?php _e( 'Alt Generated so Far', 'everyalt' )?> </h3>
 		
 			<?php 
 			$i = 0;

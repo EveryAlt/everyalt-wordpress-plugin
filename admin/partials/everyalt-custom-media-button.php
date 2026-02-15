@@ -13,7 +13,7 @@
  */
 ?>
 
-<div id="every-alt-custom-media-button" 
+<div id="everyalt-custom-media-button" 
     data-admin="<?php echo admin_url()?>"
     data-media="<?php echo $post->ID ?>"
     >

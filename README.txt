@@ -25,7 +25,7 @@ Explore all the features with our full [EveryAlt WordPress plugin tutorial](http
 
 == Installation ==
 
-1. Upload the contents of the `every-alt.zip` file to the `/wp-content/plugins/every-alt` directory
+1. Upload the contents of the `everyalt.zip` file to the `/wp-content/plugins/everyalt` directory
 1. Activate the plugin through the 'Plugins' menu in WordPress
 
 == Changelog ==

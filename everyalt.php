@@ -21,7 +21,7 @@
  * Author URI:        https://workwithhdc.com
  * License:           GPL-2.0+
  * License URI:       http://www.gnu.org/licenses/gpl-2.0.txt
- * Text Domain:       every-alt
+ * Text Domain:       everyalt
  * Domain Path:       /languages
  */
 
@@ -39,19 +39,19 @@ define( 'EVERY_ALT_VERSION', '0.0.2' );
 
 /**
  * The code that runs during plugin activation.
- * This action is documented in includes/class-every-alt-activator.php
+ * This action is documented in includes/class-everyalt-activator.php
  */
 function activate_every_alt() {
-	require_once plugin_dir_path( __FILE__ ) . 'includes/class-every-alt-activator.php';
+	require_once plugin_dir_path( __FILE__ ) . 'includes/class-everyalt-activator.php';
 	Every_Alt_Activator::activate();
 }
 
 /**
  * The code that runs during plugin deactivation.
- * This action is documented in includes/class-every-alt-deactivator.php
+ * This action is documented in includes/class-everyalt-deactivator.php
  */
 function deactivate_every_alt() {
-	require_once plugin_dir_path( __FILE__ ) . 'includes/class-every-alt-deactivator.php';
+	require_once plugin_dir_path( __FILE__ ) . 'includes/class-everyalt-deactivator.php';
 	Every_Alt_Deactivator::deactivate();
 }
 
@@ -62,7 +62,7 @@ register_deactivation_hook( __FILE__, 'deactivate_every_alt' );
  * The core plugin class that is used to define internationalization,
  * admin-specific hooks, and public-facing site hooks.
  */
-require plugin_dir_path( __FILE__ ) . 'includes/class-every-alt.php';
+require plugin_dir_path( __FILE__ ) . 'includes/class-everyalt.php';
 
 /**
  * Begins execution of the plugin.

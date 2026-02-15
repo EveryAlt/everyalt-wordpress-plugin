@@ -14,16 +14,16 @@
 ?>
 
 <!-- hedaer -->
-<div class="every-alt-header">
-    <div class="every-alt-container">
-		<div class="every-alt-logo">
-			<img src=<?php echo $logo_url ?> alt="<?php _e( 'Every Alt', 'every-alt' )?>"> 
+<div class="everyalt-header">
+    <div class="everyalt-container">
+		<div class="everyalt-logo">
+			<img src=<?php echo $logo_url ?> alt="<?php _e( 'Every Alt', 'everyalt' )?>"> 
 		</div>
-		<nav class="every-alt-nav">
+		<nav class="everyalt-nav">
 			<ul>
-				<li class="<?php echo $active == 'settings' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=every-alt&tab=settings"><?php _e( 'Settings', 'every-alt' )?></a></li>
-				<li class="<?php echo $active == 'bulk' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=every-alt&tab=bulk"><?php _e( 'Bulk Alt Text Generator', 'every-alt' )?></a></li>
-				<li class="<?php echo $active == 'history' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=every-alt&tab=history"><?php _e( 'History', 'every-alt' )?></a></li>
+				<li class="<?php echo $active == 'settings' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=everyalt&tab=settings"><?php _e( 'Settings', 'everyalt' )?></a></li>
+				<li class="<?php echo $active == 'bulk' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=everyalt&tab=bulk"><?php _e( 'Bulk Alt Text Generator', 'everyalt' )?></a></li>
+				<li class="<?php echo $active == 'history' ? 'active':''?>"><a href="<?php echo admin_url()?>upload.php?page=everyalt&tab=history"><?php _e( 'History', 'everyalt' )?></a></li>
 			</ul>
 		</nav>
 	</div>
@@ -34,8 +34,8 @@
 
 <!-- This file should primarily consist of HTML with a little bit of PHP. -->
 <?php if($active == 'settings'):?>
-    <div class="every-alt-settings-page" 
-    id="every-alt-plugin" 
+    <div class="everyalt-settings-page" 
+    id="everyalt-plugin" 
     data-logo="<?php echo $logo_url?>"
     data-active="<?php echo $active ?>"
     data-admin="<?php echo admin_url()?>"
@@ -44,8 +44,8 @@
 <?php endif ?>
 
 <?php if($active == 'bulk'):?>
-    <div class="every-alt-settings-page" 
-    id="every-alt-bulk" 
+    <div class="everyalt-settings-page" 
+    id="everyalt-bulk" 
     data-logo="<?php echo $logo_url?>"
     data-active="<?php echo $active ?>"
     data-admin="<?php echo admin_url()?>"
@@ -61,8 +61,8 @@
 <?php endif ?>
 
 <?php if($active == 'history'):?>
-    <div class="every-alt-settings-page" 
-    id="every-alt-history" 
+    <div class="everyalt-settings-page" 
+    id="everyalt-history" 
     data-images="<?php echo htmlspecialchars(json_encode($images), ENT_QUOTES, 'UTF-8') ?>"
     data-logo="<?php echo $logo_url?>"
     data-active="<?php echo $active ?>"
