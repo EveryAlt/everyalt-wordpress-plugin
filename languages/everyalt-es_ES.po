@@ -17,7 +17,7 @@ msgstr ""
 "X-Domain: everyalt\n"
 "X-Generator: Manual\n"
 
-#: admin/class-everyalt-admin.php:111
+#: admin/class-everyalt-admin.php:111 admin/partials/everyalt-options-display.php:189
 msgid "Time"
 msgstr "Hora"
 
@@ -25,11 +25,11 @@ msgstr "Hora"
 msgid "Attachment ID"
 msgstr "ID del adjunto"
 
-#: admin/class-everyalt-admin.php:113
+#: admin/class-everyalt-admin.php:113 admin/partials/everyalt-options-display.php:191
 msgid "Status"
 msgstr "Estado"
 
-#: admin/class-everyalt-admin.php:114
+#: admin/class-everyalt-admin.php:114 admin/partials/everyalt-options-display.php:192
 msgid "Message / Alt text"
 msgstr "Mensaje / Texto alternativo"
 
@@ -37,15 +37,15 @@ msgstr "Mensaje / Texto alternativo"
 msgid "Cost (USD)"
 msgstr "Coste (USD)"
 
-#: admin/class-everyalt-admin.php:116
+#: admin/class-everyalt-admin.php:116 admin/partials/everyalt-options-display.php:194
 msgid "Details"
 msgstr "Detalles"
 
-#: admin/class-everyalt-admin.php:120
+#: admin/class-everyalt-admin.php:120 admin/partials/everyalt-options-display.php:228
 msgid "Success"
 msgstr "Éxito"
 
-#: admin/class-everyalt-admin.php:120
+#: admin/class-everyalt-admin.php:120 admin/partials/everyalt-options-display.php:230
 msgid "Error"
 msgstr "Error"
 
@@ -81,11 +81,11 @@ msgstr "Omitido: no es una imagen válida o el archivo supera 4 MB."
 msgid "No alt text returned from API."
 msgstr "La API no devolvió texto alternativo."
 
-#: admin/class-everyalt-admin.php:551
+#: admin/class-everyalt-admin.php:551 admin/partials/everyalt-options-display.php:14 admin/partials/everyalt-options-display.php:29
 msgid "Settings"
 msgstr "Ajustes"
 
-#: admin/class-everyalt-admin.php:570
+#: admin/class-everyalt-admin.php:570 admin/partials/everyalt-options-display.php:11
 msgid "EveryAlt"
 msgstr "EveryAlt"
 
@@ -105,23 +105,15 @@ msgstr "No se pudo codificar la imagen para la API. En algunos servidores, la co
 msgid "Response was cut off (max tokens reached). Increase Max completion tokens in Settings to resolve this."
 msgstr "La respuesta se cortó (se alcanzó el máximo de tokens). Aumenta los tokens de finalización máximos en Ajustes para solucionarlo."
 
-#: admin/partials/everyalt-options-display.php:11
-msgid "EveryAlt"
-msgstr "EveryAlt"
-
 #: admin/partials/everyalt-options-display.php:13
 msgid "Secondary menu"
 msgstr "Menú secundario"
 
-#: admin/partials/everyalt-options-display.php:14
-msgid "Settings"
-msgstr "Ajustes"
-
-#: admin/partials/everyalt-options-display.php:15
+#: admin/partials/everyalt-options-display.php:15 admin/partials/everyalt-options-display.php:100
 msgid "Bulk Alt Text Generator"
 msgstr "Generador masivo de texto alternativo"
 
-#: admin/partials/everyalt-options-display.php:16
+#: admin/partials/everyalt-options-display.php:16 admin/partials/everyalt-options-display.php:144
 msgid "Review Alt Text"
 msgstr "Revisar texto alternativo"
 
@@ -136,10 +128,6 @@ msgstr "Ajustes guardados."
 #: admin/partials/everyalt-options-display.php:24
 msgid "The OpenAI API key you entered could not be validated. Please check the key and try again. It was not saved."
 msgstr "La clave API de OpenAI que introdujiste no pudo validarse. Comprueba la clave e inténtalo de nuevo. No se ha guardado."
-
-#: admin/partials/everyalt-options-display.php:29
-msgid "Settings"
-msgstr "Ajustes"
 
 #: admin/partials/everyalt-options-display.php:34
 msgid "OpenAI API Key"
@@ -193,10 +181,6 @@ msgstr "Instrucción enviada a la IA con cada imagen. Edítala según necesites.
 msgid "Save Settings"
 msgstr "Guardar ajustes"
 
-#: admin/partials/everyalt-options-display.php:100
-msgid "Bulk Alt Text Generator"
-msgstr "Generador masivo de texto alternativo"
-
 #: admin/partials/everyalt-options-display.php:101
 msgid "This page finds all images in your media library that do not currently have alt text and lets you generate new alt text with EveryAlt quickly. To see existing images that already have alt text, go to the <a href=\"%s\">Review Alt Text</a> tab."
 msgstr "Esta página encuentra todas las imágenes de tu biblioteca de medios que aún no tienen texto alternativo y te permite generar uno con EveryAlt rápidamente. Para ver las imágenes que ya tienen texto alternativo, ve a la pestaña <a href=\"%s\">Revisar texto alternativo</a>."
@@ -225,13 +209,9 @@ msgstr "Generar texto alternativo para los seleccionados"
 msgid "Processing…"
 msgstr "Procesando…"
 
-#: admin/partials/everyalt-options-display.php:132
+#: admin/partials/everyalt-options-display.php:132 admin/partials/everyalt-options-display.php:161
 msgid "Edit"
 msgstr "Editar"
-
-#: admin/partials/everyalt-options-display.php:144
-msgid "Review Alt Text"
-msgstr "Revisar texto alternativo"
 
 #: admin/partials/everyalt-options-display.php:145
 msgid "Images that already have alt text. Edit and save, or regenerate with EveryAlt."
@@ -244,10 +224,6 @@ msgstr "Introduce tu clave API de OpenAI en la pestaña Ajustes para usar Regene
 #: admin/partials/everyalt-options-display.php:150
 msgid "No images with alt text found."
 msgstr "No se encontraron imágenes con texto alternativo."
-
-#: admin/partials/everyalt-options-display.php:161
-msgid "Edit"
-msgstr "Editar"
 
 #: admin/partials/everyalt-options-display.php:165
 msgid "Save"
@@ -269,37 +245,13 @@ msgstr "Últimos 100 intentos de generación de texto alternativo (éxitos y fal
 msgid "Export as CSV"
 msgstr "Exportar como CSV"
 
-#: admin/partials/everyalt-options-display.php:189
-msgid "Time"
-msgstr "Hora"
-
 #: admin/partials/everyalt-options-display.php:190
 msgid "Attachment"
 msgstr "Adjunto"
 
-#: admin/partials/everyalt-options-display.php:191
-msgid "Status"
-msgstr "Estado"
-
-#: admin/partials/everyalt-options-display.php:192
-msgid "Message / Alt text"
-msgstr "Mensaje / Texto alternativo"
-
 #: admin/partials/everyalt-options-display.php:193
 msgid "Cost"
 msgstr "Coste"
-
-#: admin/partials/everyalt-options-display.php:194
-msgid "Details"
-msgstr "Detalles"
-
-#: admin/partials/everyalt-options-display.php:228
-msgid "Success"
-msgstr "Éxito"
-
-#: admin/partials/everyalt-options-display.php:230
-msgid "Error"
-msgstr "Error"
 
 #: admin/partials/everyalt-options-display.php:244
 msgid "No log entries yet. Generate alt text from the Bulk tab or when uploading images to populate this log."
