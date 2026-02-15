@@ -43,7 +43,7 @@ class Every_Alt_Admin {
 	 * @param string $status   'success' or 'error'
 	 * @param string $message  Short message
 	 * @param string $detail   Optional longer detail (e.g. API error body)
-	 * @param string $usage    Optional token usage (e.g. "Prompt: 193, Completion: 12, Total: 205")
+	 * @param string $usage    Optional token usage (e.g. "Input Tokens: 193, Output Tokens: 12, Total: 205")
 	 * @param string $cost     Optional estimated cost in cents (e.g. "0.0123¢" for gpt-5-nano)
 	 */
 	private function every_alt_add_generation_log( $attachment_id, $status, $message, $detail = '', $usage = '', $cost = '' ) {
@@ -73,6 +73,25 @@ class Every_Alt_Admin {
 	}
 
 	/**
+	 * If CSV export was requested, send it and exit. Run on admin_init so headers are not yet sent.
+	 */
+	public function every_alt_maybe_export_logs_csv() {
+		if ( ! isset( $_GET['page'] ) || $_GET['page'] !== $this->plugin_name ) {
+			return;
+		}
+		if ( ! isset( $_GET['export_csv'] ) || ! isset( $_GET['_wpnonce'] ) ) {
+			return;
+		}
+		if ( ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'everyalt_export_logs' ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		$this->every_alt_export_logs_csv();
+	}
+
+	/**
 	 * Send generation log as a CSV download. Exits after output.
 	 */
 	public function every_alt_export_logs_csv() {
@@ -93,21 +112,30 @@ class Every_Alt_Admin {
 			__( 'Attachment ID', 'everyalt' ),
 			__( 'Status', 'everyalt' ),
 			__( 'Message / Alt text', 'everyalt' ),
-			__( 'Usage', 'everyalt' ),
-			__( 'Cost', 'everyalt' ),
+			__( 'Cost (USD)', 'everyalt' ),
 			__( 'Details', 'everyalt' ),
 		);
 		fputcsv( $out, $headers );
 		foreach ( $log as $entry ) {
 			$status_label = ( isset( $entry['status'] ) && $entry['status'] === 'success' ) ? __( 'Success', 'everyalt' ) : __( 'Error', 'everyalt' );
+			$detail       = isset( $entry['detail'] ) ? $entry['detail'] : '';
+			$usage        = isset( $entry['usage'] ) ? $entry['usage'] : '';
+			if ( isset( $entry['status'] ) && $entry['status'] === 'success' && $usage !== '' ) {
+				$detail = ( $detail !== '' ? $usage . "\n\n" . $detail : $usage );
+			}
+			$cost_raw = isset( $entry['cost'] ) ? $entry['cost'] : '';
+			$cost_usd = '';
+			if ( $cost_raw !== '' && preg_match( '/^([\d.]+)\s*¢?$/', trim( $cost_raw ), $m ) ) {
+				$cents = (float) $m[1];
+				$cost_usd = '$' . number_format( $cents / 100, 8 );
+			}
 			$row = array(
 				isset( $entry['time'] ) ? $entry['time'] : '',
 				isset( $entry['attachment_id'] ) ? $entry['attachment_id'] : '',
 				$status_label,
 				isset( $entry['message'] ) ? $entry['message'] : '',
-				isset( $entry['usage'] ) ? $entry['usage'] : '',
-				isset( $entry['cost'] ) ? $entry['cost'] : '',
-				isset( $entry['detail'] ) ? $entry['detail'] : '',
+				$cost_usd,
+				$detail,
 			);
 			fputcsv( $out, $row );
 		}
@@ -621,12 +649,6 @@ class Every_Alt_Admin {
 	 * @since  1.0.0
 	 */
 	public function display_options_page() {
-		// Export logs as CSV (must run before any output).
-		if ( isset( $_GET['export_csv'] ) && isset( $_GET['_wpnonce'] ) && wp_verify_nonce( sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ), 'everyalt_export_logs' ) ) {
-			$this->every_alt_export_logs_csv();
-			return;
-		}
-
 		$tab = isset($_GET['tab']) && !empty($_GET['tab']) ? $_GET['tab'] : 'settings';
 		$active = $tab;
 		

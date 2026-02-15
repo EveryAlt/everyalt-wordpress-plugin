@@ -281,10 +281,10 @@ class Every_Alt_OpenAI {
 		}
 		$parts = array();
 		if ( $p !== null ) {
-			$parts[] = 'Prompt: ' . $p;
+			$parts[] = 'Input Tokens: ' . $p;
 		}
 		if ( $c !== null ) {
-			$parts[] = 'Completion: ' . $c;
+			$parts[] = 'Output Tokens: ' . $c;
 		}
 		if ( $t !== null ) {
 			$parts[] = 'Total: ' . $t;

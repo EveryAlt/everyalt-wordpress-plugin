@@ -190,13 +190,21 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						<th style="width:90px"><?php esc_html_e( 'Attachment', 'everyalt' ); ?></th>
 						<th style="width:80px"><?php esc_html_e( 'Status', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Message / Alt text', 'everyalt' ); ?></th>
-						<th style="width:140px"><?php esc_html_e( 'Usage', 'everyalt' ); ?></th>
 						<th style="width:90px"><?php esc_html_e( 'Cost', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Details', 'everyalt' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php foreach ( $generation_log as $entry ) : ?>
+						<?php
+						$status   = isset( $entry['status'] ) ? $entry['status'] : '';
+						$detail   = isset( $entry['detail'] ) ? $entry['detail'] : '';
+						$usage    = isset( $entry['usage'] ) ? $entry['usage'] : '';
+						$details_display = $detail;
+						if ( $status === 'success' && $usage !== '' ) {
+							$details_display = ( $details_display !== '' ? $usage . "\n\n" . $details_display : $usage );
+						}
+						?>
 						<tr>
 							<td><?php echo esc_html( $entry['time'] ); ?></td>
 							<td>
@@ -216,7 +224,6 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 							</td>
 							<td>
 								<?php
-								$status = isset( $entry['status'] ) ? $entry['status'] : '';
 								if ( $status === 'success' ) {
 									echo '<span style="color:green">' . esc_html__( 'Success', 'everyalt' ) . '</span>';
 								} else {
@@ -225,10 +232,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 								?>
 							</td>
 							<td><?php echo esc_html( isset( $entry['message'] ) ? $entry['message'] : '' ); ?></td>
-							<td><?php echo esc_html( isset( $entry['usage'] ) ? $entry['usage'] : '—' ); ?></td>
 							<td><?php echo esc_html( isset( $entry['cost'] ) ? $entry['cost'] : '—' ); ?></td>
 							<td class="everyalt-log-detail">
-								<div class="everyalt-log-detail-inner"><?php echo esc_html( isset( $entry['detail'] ) ? $entry['detail'] : '' ); ?></div>
+								<div class="everyalt-log-detail-inner"><?php echo esc_html( $details_display ); ?></div>
 							</td>
 						</tr>
 					<?php endforeach; ?>
