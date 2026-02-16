@@ -121,6 +121,14 @@ msgstr "Revisar texto alternativo"
 msgid "Logs"
 msgstr "Registros"
 
+#: admin/partials/everyalt-options-display.php:24
+msgid "EveryAlt is a free, open-source project created by %1$sHDC%2$s, a web dev firm for high-stakes projects and AI builds."
+msgstr "EveryAlt es un proyecto gratuito y de código abierto creado por %1$sHDC%2$s, una empresa de desarrollo web para proyectos de alto impacto y desarrollos con IA."
+
+#: admin/partials/everyalt-options-display.php:35
+msgid "EveryAlt also has a free Chrome extension and Shopify app. Check out our %1$sDigital Agency Plan%2$s if you manage lots of sites and want to set up limits and permissions for your clients or team."
+msgstr "EveryAlt también tiene una extensión gratuita para Chrome y una app para Shopify. Descubre nuestro %1$sPlan para Agencias Digitales%2$s si gestionas muchos sitios y quieres configurar límites y permisos para tus clientes o equipo."
+
 #: admin/partials/everyalt-options-display.php:21
 msgid "Settings saved."
 msgstr "Ajustes guardados."

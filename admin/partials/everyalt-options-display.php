@@ -17,6 +17,34 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
 	</h2>
 
+	<div class="notice notice-info everyalt-intro-notice" style="margin-top:1em;">
+		<p>
+			<?php
+			echo wp_kses(
+				sprintf(
+					/* translators: 1: opening link to hdc.net, 2: closing link tag */
+					__( 'EveryAlt is a free, open-source project created by %1$sHDC%2$s, a web dev firm for high-stakes projects and AI builds.', 'everyalt' ),
+					'<a href="' . esc_url( 'https://hdc.net' ) . '" target="_blank" rel="noopener noreferrer">',
+					'</a>'
+				),
+				array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) )
+			);
+			?>
+			</p><p>
+			<?php
+			echo wp_kses(
+				sprintf(
+					/* translators: 1: opening link to everyalt.com, 2: closing link tag */
+					__( 'EveryAlt also has a free Chrome extension and Shopify app. Check out our %1$sDigital Agency Plan%2$s if you manage lots of sites and want to set up limits and permissions for your clients or team.', 'everyalt' ),
+					'<a href="' . esc_url( 'https://everyalt.com' ) . '" target="_blank" rel="noopener noreferrer">',
+					'</a>'
+				),
+				array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) )
+			);
+			?>
+		</p>
+	</div>
+
 <?php if ( isset( $_GET['updated'] ) && $_GET['updated'] === '1' ) : ?>
 	<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'everyalt' ); ?></p></div>
 <?php endif; ?>

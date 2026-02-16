@@ -121,6 +121,14 @@ msgstr "Alt-tekst beoordelen"
 msgid "Logs"
 msgstr "Logboeken"
 
+#: admin/partials/everyalt-options-display.php:24
+msgid "EveryAlt is a free, open-source project created by %1$sHDC%2$s, a web dev firm for high-stakes projects and AI builds."
+msgstr "EveryAlt is een gratis, open-source project van %1$sHDC%2$s, een webbureau voor projecten met hoge inzet en AI-ontwikkeling."
+
+#: admin/partials/everyalt-options-display.php:35
+msgid "EveryAlt also has a free Chrome extension and Shopify app. Check out our %1$sDigital Agency Plan%2$s if you manage lots of sites and want to set up limits and permissions for your clients or team."
+msgstr "EveryAlt heeft ook een gratis Chrome-extensie en Shopify-app. Bekijk ons %1$sDigital Agency Plan%2$s als je veel sites beheert en limieten en rechten voor je klanten of team wilt instellen."
+
 #: admin/partials/everyalt-options-display.php:21
 msgid "Settings saved."
 msgstr "Instellingen opgeslagen."
