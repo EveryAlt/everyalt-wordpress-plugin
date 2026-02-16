@@ -31,6 +31,21 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 /**
+ * Check for updates from GitHub (private update server).
+ * Runs on every load so update notifications are visible to the dashboard and to management tools (e.g. WP-CLI).
+ */
+$everyalt_puc = plugin_dir_path( __FILE__ ) . 'vendor/plugin-update-checker/plugin-update-checker.php';
+if ( file_exists( $everyalt_puc ) ) {
+	require_once $everyalt_puc;
+	$everyalt_updater = \YahnisElsts\PluginUpdateChecker\v5\PucFactory::buildUpdateChecker(
+		'https://github.com/EveryAlt/everyalt-wordpress-plugin',
+		__FILE__,
+		'everyalt'
+	);
+	$everyalt_updater->getVcsApi()->enableReleaseAssets();
+}
+
+/**
  * Currently plugin version.
  * Start at version 1.0.0 and use SemVer - https://semver.org
  * Rename this for your plugin and update it as you release new versions.
