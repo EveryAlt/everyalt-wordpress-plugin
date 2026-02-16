@@ -9,6 +9,9 @@ node_modules/
 vendor/
 dist/
 
+# Release zips (for GitHub Releases upload)
+everyalt-*.zip
+
 # Local / env (if you ever add .env for local keys)
 .env
 .env.local
