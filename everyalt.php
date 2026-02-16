@@ -16,7 +16,7 @@
  * Plugin Name:       EveryAlt
  * Plugin URI:        https://everyalt.com
  * Description:       Instantly generate alternative text for all your images.
- * Version:           1.0
+ * Version:           1.0.1
  * Author:            HDC
  * Author URI:        https://hdc.net
  * License:           GPL-2.0+
@@ -50,7 +50,7 @@ if ( file_exists( $everyalt_puc ) ) {
  * Start at version 1.0.0 and use SemVer - https://semver.org
  * Rename this for your plugin and update it as you release new versions.
  */
-define( 'EVERY_ALT_VERSION', '1.0' );
+define( 'EVERY_ALT_VERSION', '1.0.1' );
 
 /**
  * The code that runs during plugin activation.
