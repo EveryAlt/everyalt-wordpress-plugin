@@ -17,6 +17,8 @@ class Every_Alt_OpenAI {
 
 	const DEFAULT_PROMPT = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
 
+	const DEFAULT_TITLE_PROMPT = 'Write a short, descriptive title for this image, suitable for a WordPress image title (about 3 to 6 words, Title Case). Do not use quotation marks, a trailing period, or phrases like "This image shows". Output only the title, nothing else.';
+
 	// Reasoning models (e.g. gpt-5-nano) use tokens for internal "thinking"; we need enough for reasoning + actual output.
 	const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
 
@@ -123,37 +125,75 @@ class Every_Alt_OpenAI {
 	 * @return object { alt: string|null, error: string|null, error_detail: string|null } Always returns object; check ->error for failure.
 	 */
 	public function generate_alt( $attachment_id ) {
+		$saved_prompt = get_option( 'every_alt_vision_prompt', '' );
+		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
+		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
+
+		$result = $this->generate_text( $attachment_id, $prompt );
+
+		// Map shared 'text' field onto 'alt' for backward compatibility.
+		$result->alt = isset( $result->text ) ? $result->text : null;
+		unset( $result->text );
+		return $result;
+	}
+
+	/**
+	 * Generate a short image title for an attachment using OpenAI Vision. Image is sent as base64.
+	 *
+	 * @param int $attachment_id
+	 * @return object { title: string|null, error: string|null, error_detail: string|null, usage: string, cost: string } Always returns object; check ->error for failure.
+	 */
+	public function generate_title( $attachment_id ) {
+		$saved_prompt = get_option( 'every_alt_title_prompt', '' );
+		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_TITLE_PROMPT;
+		$prompt       = apply_filters( 'everyalt_title_prompt', $prompt );
+
+		$result = $this->generate_text( $attachment_id, $prompt );
+
+		$result->title = isset( $result->text ) ? $result->text : null;
+		unset( $result->text );
+		return $result;
+	}
+
+	/**
+	 * Shared core: send the image plus a text prompt to OpenAI Vision and return the text response.
+	 *
+	 * @param int    $attachment_id
+	 * @param string $prompt        Instruction sent with the image.
+	 * @return object { text: string|null, error: string|null, error_detail: string|null, usage: string, cost: string }
+	 */
+	private function generate_text( $attachment_id, $prompt ) {
 		$path = $this->get_image_path_for_vision( $attachment_id );
 		if ( ! $path ) {
-			return (object) array( 'alt' => null, 'error' => 'Could not get image path for attachment.', 'error_detail' => '' );
+			return (object) array( 'text' => null, 'error' => 'Could not get image path for attachment.', 'error_detail' => '', 'usage' => '', 'cost' => '' );
 		}
 		$bytes = file_get_contents( $path );
 		if ( $bytes === false ) {
-			return (object) array( 'alt' => null, 'error' => 'Could not read image file.', 'error_detail' => $path );
+			return (object) array( 'text' => null, 'error' => 'Could not read image file.', 'error_detail' => $path, 'usage' => '', 'cost' => '' );
 		}
 		$base64_encode_error = __( 'Image could not be encoded for the API. On some servers, base64 encoding fails for large images or due to PHP limits. Try a smaller image, or increase your server\'s PHP memory limit.', 'everyalt' );
 		try {
 			$base64 = base64_encode( $bytes );
 		} catch ( \Throwable $e ) {
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => $base64_encode_error,
 				'error_detail' => $e->getMessage(),
+				'usage'        => '',
+				'cost'         => '',
 			);
 		}
 		if ( $bytes !== '' && $base64 === '' ) {
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => $base64_encode_error,
 				'error_detail' => $path,
+				'usage'        => '',
+				'cost'         => '',
 			);
 		}
 		$mime     = $this->get_mime_type( $path );
 		$data_url = 'data:' . $mime . ';base64,' . $base64;
-
-		$saved_prompt = get_option( 'every_alt_vision_prompt', '' );
-		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
-		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
 
 		$saved_max   = get_option( 'every_alt_max_completion_tokens', '' );
 		$max_tokens  = $saved_max !== '' ? max( 1, (int) $saved_max ) : self::DEFAULT_MAX_COMPLETION_TOKENS;
@@ -195,7 +235,7 @@ class Every_Alt_OpenAI {
 
 		if ( is_wp_error( $response ) ) {
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => 'Request failed: ' . $response->get_error_message(),
 				'error_detail' => '',
 				'usage'        => '',
@@ -215,7 +255,7 @@ class Every_Alt_OpenAI {
 				$detail = $json['error']['message'];
 			}
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => 'OpenAI API returned ' . $code,
 				'error_detail' => $detail,
 				'usage'        => $usage,
@@ -226,41 +266,41 @@ class Every_Alt_OpenAI {
 		$finish_reason = isset( $json['choices'][0]['finish_reason'] ) ? $json['choices'][0]['finish_reason'] : '';
 
 		// Content can be a string or an array of content parts (e.g. [ { "type": "text", "text": "..." } ] ).
-		$alt = '';
+		$text = '';
 		if ( is_string( $content ) ) {
-			$alt = $content;
+			$text = $content;
 		} elseif ( is_array( $content ) ) {
 			foreach ( $content as $part ) {
 				if ( isset( $part['type'] ) && $part['type'] === 'text' && isset( $part['text'] ) ) {
-					$alt .= $part['text'];
+					$text .= $part['text'];
 				}
 			}
 		}
 
-		$alt = trim( $alt );
+		$text = trim( $text );
 
 		if ( $finish_reason === 'length' ) {
 			$length_message = __( 'Response was cut off (max tokens reached). Increase Max completion tokens in Settings to resolve this.', 'everyalt' );
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => $length_message,
-				'error_detail' => $alt !== '' ? $alt : $body_raw,
+				'error_detail' => $text !== '' ? $text : $body_raw,
 				'usage'        => $usage,
 				'cost'         => $cost,
 			);
 		}
 
-		if ( $alt === '' ) {
+		if ( $text === '' ) {
 			return (object) array(
-				'alt'          => null,
+				'text'         => null,
 				'error'        => 'OpenAI response had no content.',
 				'error_detail' => $body_raw,
 				'usage'        => $usage,
 				'cost'         => $cost,
 			);
 		}
-		$alt = sanitize_text_field( $alt );
-		return (object) array( 'alt' => $alt, 'error' => null, 'error_detail' => null, 'usage' => $usage, 'cost' => $cost );
+		$text = sanitize_text_field( $text );
+		return (object) array( 'text' => $text, 'error' => null, 'error_detail' => null, 'usage' => $usage, 'cost' => $cost );
 	}
 
 	/**

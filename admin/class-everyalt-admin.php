@@ -334,13 +334,19 @@ class Every_Alt_Admin {
 		if ( ! is_array( $meta_value ) || empty( $meta_value['sizes'] ) ) {
 			return;
 		}
-		if ( get_post_meta( $object_id, '_wp_attachment_image_alt', true ) !== '' ) {
+		if ( ! $this->get_openai_key() ) {
 			return;
 		}
-		if ( ! get_option( $this->option_name . '_auto' ) || ! $this->get_openai_key() ) {
-			return;
+
+		// Auto alt text: only when alt is currently empty.
+		if ( get_option( $this->option_name . '_auto' ) && get_post_meta( $object_id, '_wp_attachment_image_alt', true ) === '' ) {
+			$this->every_alt_auto_add_image_alt_text( $object_id, false );
 		}
-		$this->every_alt_auto_add_image_alt_text( $object_id, false );
+
+		// Auto title: only when the current title still looks like the raw filename.
+		if ( get_option( $this->option_name . '_auto_title' ) && $this->every_alt_title_is_filename_like( $object_id ) ) {
+			$this->every_alt_auto_add_image_title( $object_id, false );
+		}
 	}
 
 	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
@@ -394,6 +400,101 @@ class Every_Alt_Admin {
 			return $generated_alt;
 		}
 		return $generated_alt->alt;
+	}
+
+	//auto title – direct OpenAI Vision API, image sent as base64 (medium size)
+	public function every_alt_auto_add_image_title( $attachment_ID, $bulk = null ) {
+		$api_key = $this->get_openai_key();
+		$auto    = get_option( $this->option_name . '_auto_title' );
+		if ( $bulk ) {
+			$auto = 1;
+		}
+		if ( ! $api_key || ! $auto ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: no API key or auto-generate disabled.', 'everyalt' ), '' );
+			return null;
+		}
+		if ( ! $this->every_alt_validate_token() ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: API key validation failed.', 'everyalt' ), '' );
+			return null;
+		}
+		if ( ! $this->every_alt_is_valid_image( $attachment_ID ) ) {
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
+			return null;
+		}
+
+		$openai          = new Every_Alt_OpenAI( $api_key );
+		$generated_title = $openai->generate_title( $attachment_ID );
+
+		if ( ! empty( $generated_title->error ) ) {
+			$usage = isset( $generated_title->usage ) ? $generated_title->usage : '';
+			$cost  = isset( $generated_title->cost ) ? $generated_title->cost : '';
+			// Do not pass error_detail to log if it contains a server path (information disclosure).
+			$detail_for_log = $generated_title->error_detail;
+			if ( $detail_for_log !== '' && ( strpos( $detail_for_log, '/' ) !== false || strpos( $detail_for_log, '\\' ) !== false ) ) {
+				$detail_for_log = '';
+			}
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', '[Title] ' . $generated_title->error, $detail_for_log, $usage, $cost );
+			return null;
+		}
+		if ( empty( $generated_title->title ) ) {
+			$usage = isset( $generated_title->usage ) ? $generated_title->usage : '';
+			$cost  = isset( $generated_title->cost ) ? $generated_title->cost : '';
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] No title returned from API.', 'everyalt' ), '', $usage, $cost );
+			return null;
+		}
+
+		wp_update_post( array(
+			'ID'         => $attachment_ID,
+			'post_title' => $generated_title->title,
+		) );
+		$usage = isset( $generated_title->usage ) ? $generated_title->usage : '';
+		$cost  = isset( $generated_title->cost ) ? $generated_title->cost : '';
+		$this->every_alt_add_generation_log( $attachment_ID, 'success', '[Title] ' . $generated_title->title, '', $usage, $cost );
+
+		if ( $bulk ) {
+			return $generated_title;
+		}
+		return $generated_title->title;
+	}
+
+	/**
+	 * Whether an attachment's current title still looks like the raw upload filename
+	 * (so it would benefit from a generated title). Empty titles also qualify.
+	 *
+	 * @param int $attachment_id
+	 * @return bool
+	 */
+	private function every_alt_title_is_filename_like( $attachment_id ) {
+		$post = get_post( $attachment_id );
+		if ( ! $post ) {
+			return false;
+		}
+		$title = trim( (string) $post->post_title );
+		if ( $title === '' ) {
+			return true;
+		}
+
+		$normalize = function ( $s ) {
+			$s = strtolower( (string) $s );
+			$s = preg_replace( '/[_\-\s]+/', ' ', $s );
+			return trim( $s );
+		};
+
+		// Primary signal: title matches the uploaded filename (without extension).
+		$file = get_attached_file( $attachment_id );
+		if ( $file ) {
+			$base = pathinfo( $file, PATHINFO_FILENAME );
+			if ( $normalize( $title ) === $normalize( $base ) ) {
+				return true;
+			}
+		}
+
+		// Secondary signal: common camera / screenshot default filenames.
+		if ( preg_match( '/^(img|dsc|dscn|dscf|pxl|gopr|mvimg|screenshot|screen[ _-]?shot|scan|capture|untitled|photo|image|wa)[ _-]?\d+/i', $title ) ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	private function every_alt_is_valid_image($media_id) {
@@ -563,6 +664,48 @@ class Every_Alt_Admin {
 		return $with_alt;
 	}
 
+	/**
+	 * Get image attachments whose title still looks like the raw filename (i.e. need a title).
+	 *
+	 * @return array Array of WP_Post objects.
+	 */
+	private function every_alt_get_images_without_title() {
+		$images = get_posts( array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'posts_per_page' => -1,
+			'post_status'    => 'any',
+		) );
+		$without_title = array();
+		foreach ( $images as $image ) {
+			if ( $this->every_alt_title_is_filename_like( $image->ID ) ) {
+				$without_title[] = $image;
+			}
+		}
+		return $without_title;
+	}
+
+	/**
+	 * Get image attachments that already have a custom (non-filename) title.
+	 *
+	 * @return array Array of WP_Post objects.
+	 */
+	private function every_alt_get_images_with_title() {
+		$images = get_posts( array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'posts_per_page' => -1,
+			'post_status'    => 'any',
+		) );
+		$with_title = array();
+		foreach ( $images as $image ) {
+			if ( ! $this->every_alt_title_is_filename_like( $image->ID ) ) {
+				$with_title[] = $image;
+			}
+		}
+		return $with_title;
+	}
+
 	
 	//settings link on plugin list page
 	function every_alt_settings_link( $links ) {
@@ -608,10 +751,10 @@ class Every_Alt_Admin {
 	 * @since  1.0.0
 	 */
 	public function display_options_page() {
-		$allowed_tabs = array( 'settings', 'bulk', 'review', 'logs' );
+		$allowed_tabs = array( 'settings', 'bulk', 'review', 'bulk_title', 'review_title', 'logs' );
 		$tab = isset( $_GET['tab'] ) && in_array( $_GET['tab'], $allowed_tabs, true ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
 		$active = $tab;
-		
+
 
 		$has_openai_key = ! empty( $this->get_openai_key() );
 
@@ -621,6 +764,14 @@ class Every_Alt_Admin {
 
 		if ( $active === 'review' ) {
 			$images_with_alt = $this->every_alt_get_images_with_alt();
+		}
+
+		if ( $active === 'bulk_title' ) {
+			$images_without_title = $this->every_alt_get_images_without_title();
+		}
+
+		if ( $active === 'review_title' ) {
+			$images_with_title = $this->every_alt_get_images_with_title();
 		}
 
 		if ( $active === 'logs' ) {
@@ -650,6 +801,16 @@ class Every_Alt_Admin {
 		register_setting(
 			$this->plugin_name,
 			$this->option_name . '_fulltext',
+			array(
+				'type'         => 'boolean',
+				'show_in_rest' => true,
+				'default'      => false,
+			)
+		);
+
+		register_setting(
+			$this->plugin_name,
+			$this->option_name . '_auto_title',
 			array(
 				'type'         => 'boolean',
 				'show_in_rest' => true,
@@ -702,8 +863,12 @@ class Every_Alt_Admin {
 		}
 		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
 		update_option( $this->option_name . '_fulltext', ! empty( $_POST[ $this->option_name . '_fulltext' ] ) ? 1 : 0 );
+		update_option( $this->option_name . '_auto_title', ! empty( $_POST[ $this->option_name . '_auto_title' ] ) ? 1 : 0 );
 		if ( isset( $_POST['every_alt_vision_prompt'] ) ) {
 			update_option( 'every_alt_vision_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_vision_prompt'] ) ) );
+		}
+		if ( isset( $_POST['every_alt_title_prompt'] ) ) {
+			update_option( 'every_alt_title_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_title_prompt'] ) ) );
 		}
 		if ( isset( $_POST['every_alt_max_completion_tokens'] ) ) {
 			$val = sanitize_text_field( wp_unslash( $_POST['every_alt_max_completion_tokens'] ) );
@@ -772,10 +937,47 @@ class Every_Alt_Admin {
 			),
 		) );
 
+		register_rest_route( 'everyalt-api/v1', '/save_title', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( $this, 'every_alt_save_title' ),
+			'permission_callback' => function () {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'media_id' => array(
+					'required'          => true,
+					'type'              => 'integer',
+					'minimum'           => 1,
+					'sanitize_callback' => 'absint',
+				),
+				'title'    => array(
+					'required'          => true,
+					'type'              => 'string',
+					'sanitize_callback' => 'sanitize_text_field',
+				),
+			),
+		) );
+
+		register_rest_route( 'everyalt-api/v1', '/bulk_generate_title', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( $this, 'bulk_generate_title' ),
+			'permission_callback' => function () {
+				return current_user_can( 'manage_options' );
+			},
+			'args'                => array(
+				'media_id' => array(
+					'required'          => true,
+					'type'              => 'integer',
+					'minimum'           => 1,
+					'sanitize_callback' => 'absint',
+				),
+			),
+		) );
 
 
-		
-		
+
+
+
     }
 
 	public function bulk_generate_alt( $request ) {
@@ -794,6 +996,28 @@ class Every_Alt_Admin {
 				'media_id' => $media_id,
 				'success'  => false,
 				'alt_text' => null,
+				'message'  => $last_error ? $last_error : __( 'Generation failed.', 'everyalt' ),
+			);
+		}
+		return new WP_REST_Response( $response, 200 );
+	}
+
+	public function bulk_generate_title( $request ) {
+		$media_id = absint( $request->get_param( 'media_id' ) );
+		$result   = $this->every_alt_auto_add_image_title( $media_id, true );
+
+		if ( $result && isset( $result->title ) ) {
+			$response = array(
+				'media_id' => $media_id,
+				'success'  => true,
+				'title'    => $result->title,
+			);
+		} else {
+			$last_error = $this->every_alt_get_last_log_message_for_attachment( $media_id );
+			$response   = array(
+				'media_id' => $media_id,
+				'success'  => false,
+				'title'    => null,
 				'message'  => $last_error ? $last_error : __( 'Generation failed.', 'everyalt' ),
 			);
 		}
@@ -831,6 +1055,21 @@ class Every_Alt_Admin {
 			'message' => __( 'Alt successfully updated.', 'everyalt' ),
 		];
 		return new WP_REST_Response($response, 200);
+	}
+
+	public function every_alt_save_title( $request ) {
+		$media_id = absint( $request->get_param( 'media_id' ) );
+		$title    = sanitize_text_field( $request->get_param( 'title' ) );
+		wp_update_post( array(
+			'ID'         => $media_id,
+			'post_title' => $title,
+		) );
+		$response = array(
+			'title'    => $title,
+			'media_id' => $media_id,
+			'message'  => __( 'Title successfully updated.', 'everyalt' ),
+		);
+		return new WP_REST_Response( $response, 200 );
 	}
 
 	private function is_user_authorized() {

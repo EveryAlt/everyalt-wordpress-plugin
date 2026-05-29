@@ -14,6 +14,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'review', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'review' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk_title', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk_title' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Image Title Generator', 'everyalt' ); ?></a>
+		<a href="<?php echo esc_url( add_query_arg( 'tab', 'review_title', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'review_title' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Review Image Titles', 'everyalt' ); ?></a>
 		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
 	</h2>
 
@@ -73,6 +75,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					<th scope="row"><?php esc_html_e( 'Auto-generate on upload', 'everyalt' ); ?></th>
 					<td>
 						<label><input type="checkbox" name="every_alt_auto" value="1" <?php checked( get_option( 'every_alt_auto', 0 ), 1 ); ?>><?php esc_html_e( 'Automatically generate alt text when images are uploaded', 'everyalt' ); ?></label>
+						<br>
+						<label><input type="checkbox" name="every_alt_auto_title" value="1" <?php checked( get_option( 'every_alt_auto_title', 0 ), 1 ); ?>><?php esc_html_e( 'Automatically generate image titles when images are uploaded', 'everyalt' ); ?></label>
 					</td>
 				</tr>
 				<tr>
@@ -110,6 +114,18 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						?>
 						<textarea name="every_alt_vision_prompt" id="every_alt_vision_prompt" class="large-text" rows="4"><?php echo esc_textarea( $editable_prompt ); ?></textarea>
 						<p class="description"><?php esc_html_e( 'Instruction sent to the AI with each image. Edit as needed. The model should return only the alt text, no extra wording.', 'everyalt' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="every_alt_title_prompt"><?php esc_html_e( 'Image title prompt', 'everyalt' ); ?></label></th>
+					<td>
+						<?php
+						$default_title_prompt  = Every_Alt_OpenAI::DEFAULT_TITLE_PROMPT;
+						$current_title_prompt  = get_option( 'every_alt_title_prompt', '' );
+						$editable_title_prompt = $current_title_prompt !== '' ? $current_title_prompt : $default_title_prompt;
+						?>
+						<textarea name="every_alt_title_prompt" id="every_alt_title_prompt" class="large-text" rows="4"><?php echo esc_textarea( $editable_title_prompt ); ?></textarea>
+						<p class="description"><?php esc_html_e( 'Instruction sent to the AI when generating image titles. Titles are usually short (a few words). The model should return only the title, no extra wording.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 			</table>
@@ -192,6 +208,87 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						<div class="everyalt-review-actions">
 							<button type="button" class="button everyalt-review-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
 							<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+						</div>
+						<span class="everyalt-review-status" aria-live="polite"></span>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		<?php endif; ?>
+	</div>
+<?php endif; ?>
+
+<?php if ( $active === 'bulk_title' ) : ?>
+	<?php
+	$error = isset( $this->error ) ? $this->error : false;
+	?>
+	<div class="everyalt-bulk-wrap">
+		<h2><?php esc_html_e( 'Bulk Image Title Generator', 'everyalt' ); ?></h2>
+		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds images whose title is still the raw upload filename (e.g. "IMG_1234") and lets you generate descriptive titles with EveryAlt quickly. To see images that already have a custom title, go to the <a href="%s">Review Image Titles</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review_title', $base_url ) ) ) ); ?></p>
+		<?php if ( $error ) : ?>
+			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
+		<?php elseif ( ! $has_openai_key ) : ?>
+			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
+		<?php elseif ( empty( $images_without_title ) ) : ?>
+			<p><?php esc_html_e( 'No images needing a title found.', 'everyalt' ); ?></p>
+		<?php else : ?>
+			<p class="everyalt-bulk-actions">
+				<button type="button" id="everyalt-bulk-title-select-all" class="button"><?php esc_html_e( 'Select all', 'everyalt' ); ?></button>
+				<button type="button" id="everyalt-bulk-title-select-none" class="button"><?php esc_html_e( 'Select none', 'everyalt' ); ?></button>
+				<button type="button" id="everyalt-bulk-title-run" class="button button-primary"><?php esc_html_e( 'Generate titles for selected', 'everyalt' ); ?></button>
+			</p>
+			<div id="everyalt-bulk-title-progress" class="everyalt-bulk-progress hidden">
+				<p class="everyalt-bulk-progress-status"><strong><?php esc_html_e( 'Processing…', 'everyalt' ); ?></strong> <span id="everyalt-bulk-title-progress-text">0 / 0</span></p>
+				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-title-progress-fill"></span></div>
+				<ul id="everyalt-bulk-title-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
+			</div>
+			<ul class="everyalt-bulk-grid" id="everyalt-bulk-title-grid">
+				<?php foreach ( $images_without_title as $image ) :
+					$aid = (int) $image->ID;
+					?>
+					<li class="everyalt-bulk-title-item" data-media-id="<?php echo $aid; ?>">
+						<label>
+							<input type="checkbox" class="everyalt-bulk-title-checkbox" value="<?php echo $aid; ?>">
+							<span class="everyalt-bulk-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
+						</label>
+						<?php
+						$edit_link = get_edit_post_link( $aid, 'raw' );
+						if ( $edit_link ) :
+							?>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+						<?php endif; ?>
+						<span class="everyalt-bulk-item-status" aria-live="polite"></span>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		<?php endif; ?>
+	</div>
+<?php endif; ?>
+
+<?php if ( $active === 'review_title' ) : ?>
+	<div class="everyalt-review-wrap">
+		<h2><?php esc_html_e( 'Review Image Titles', 'everyalt' ); ?></h2>
+		<p class="description"><?php esc_html_e( 'Images that already have a custom title. Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_openai_key ) : ?>
+			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
+		<?php endif; ?>
+		<?php if ( empty( $images_with_title ) ) : ?>
+			<p><?php esc_html_e( 'No images with a custom title found.', 'everyalt' ); ?></p>
+		<?php else : ?>
+			<ul class="everyalt-review-grid" id="everyalt-review-title-grid">
+				<?php foreach ( $images_with_title as $image ) :
+					$aid = (int) $image->ID;
+					$title = get_the_title( $aid );
+					$edit_link = get_edit_post_link( $aid, 'raw' );
+					?>
+					<li class="everyalt-review-title-item" data-media-id="<?php echo $aid; ?>">
+						<span class="everyalt-review-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
+						<?php if ( $edit_link ) : ?>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+						<?php endif; ?>
+						<textarea class="everyalt-review-title-field" rows="2" data-media-id="<?php echo $aid; ?>"><?php echo esc_textarea( $title ); ?></textarea>
+						<div class="everyalt-review-actions">
+							<button type="button" class="button everyalt-review-title-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
+							<button type="button" class="button everyalt-review-title-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
 						</div>
 						<span class="everyalt-review-status" aria-live="polite"></span>
 					</li>

@@ -233,4 +233,169 @@
 				});
 		});
 	});
+
+	// Bulk Titles: Select all / Select none
+	var titleSelectAllBtn = document.getElementById('everyalt-bulk-title-select-all');
+	var titleSelectNoneBtn = document.getElementById('everyalt-bulk-title-select-none');
+	if (titleSelectAllBtn) {
+		titleSelectAllBtn.addEventListener('click', function() {
+			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.checked = true; });
+		});
+	}
+	if (titleSelectNoneBtn) {
+		titleSelectNoneBtn.addEventListener('click', function() {
+			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.checked = false; });
+		});
+	}
+
+	// Bulk Titles run: generate titles for selected, progress bar + per-item log, no reload
+	var bulkTitleBtn = document.getElementById('everyalt-bulk-title-run');
+	if (bulkTitleBtn) {
+		var titleProgressEl = document.getElementById('everyalt-bulk-title-progress');
+		var titleProgressTextEl = document.getElementById('everyalt-bulk-title-progress-text');
+		var titleProgressFill = document.getElementById('everyalt-bulk-title-progress-fill');
+		var titleProgressBar = titleProgressEl ? titleProgressEl.querySelector('.everyalt-bulk-progress-bar') : null;
+		var titleProgressLog = document.getElementById('everyalt-bulk-title-progress-log');
+		bulkTitleBtn.addEventListener('click', function() {
+			var checkboxes = document.querySelectorAll('.everyalt-bulk-title-checkbox:checked');
+			var ids = Array.prototype.map.call(checkboxes, function(cb) { return parseInt(cb.value, 10); });
+			if (!ids.length) return;
+			titleProgressEl.classList.remove('hidden');
+			bulkTitleBtn.disabled = true;
+			if (titleSelectAllBtn) titleSelectAllBtn.disabled = true;
+			if (titleSelectNoneBtn) titleSelectNoneBtn.disabled = true;
+			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.disabled = true; });
+			var total = ids.length;
+			var done = 0;
+			if (titleProgressLog) titleProgressLog.innerHTML = '';
+			function updateProgress() {
+				var pct = total ? Math.round((done / total) * 100) : 0;
+				if (titleProgressTextEl) titleProgressTextEl.textContent = done + ' / ' + total;
+				if (titleProgressFill) titleProgressFill.style.width = pct + '%';
+				if (titleProgressBar) titleProgressBar.setAttribute('aria-valuenow', pct);
+			}
+			var index = 0;
+			function next() {
+				if (index >= ids.length) {
+					titleProgressEl.classList.add('hidden');
+					bulkTitleBtn.disabled = false;
+					if (titleSelectAllBtn) titleSelectAllBtn.disabled = false;
+					if (titleSelectNoneBtn) titleSelectNoneBtn.disabled = false;
+					document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.disabled = false; });
+					return;
+				}
+				var id = ids[index];
+				var itemEl = document.querySelector('.everyalt-bulk-title-item[data-media-id="' + id + '"]');
+				var statusEl = itemEl ? itemEl.querySelector('.everyalt-bulk-item-status') : null;
+				request('POST', '/everyalt-api/v1/bulk_generate_title', { media_id: id })
+					.then(function(data) {
+						done++;
+						updateProgress();
+						var success = data && data.success;
+						if (statusEl) {
+							statusEl.textContent = success ? '✓ ' + (data.title || '') : '✗ ' + (data.message || 'Error');
+							statusEl.className = 'everyalt-bulk-item-status ' + (success ? 'success' : 'error');
+						}
+						if (titleProgressLog) {
+							var li = document.createElement('li');
+							li.className = success ? 'success' : 'error';
+							li.textContent = '#' + id + ': ' + (success ? (data.title || '') : (data.message || 'Error'));
+							titleProgressLog.appendChild(li);
+						}
+						if (success && itemEl) {
+							var label = itemEl.querySelector('label');
+							if (label) label.style.opacity = '0.5';
+						}
+						index++;
+						next();
+					})
+					.catch(function(err) {
+						done++;
+						updateProgress();
+						var errMsg = err && err.message ? err.message : 'Request failed';
+						if (statusEl) {
+							statusEl.textContent = '✗ ' + errMsg;
+							statusEl.className = 'everyalt-bulk-item-status error';
+						}
+						if (titleProgressLog) {
+							var li = document.createElement('li');
+							li.className = 'error';
+							li.textContent = '#' + id + ': ' + errMsg;
+							titleProgressLog.appendChild(li);
+						}
+						index++;
+						next();
+					});
+			}
+			updateProgress();
+			next();
+		});
+	}
+
+	// Review Image Titles: Save edited title (AJAX)
+	document.querySelectorAll('.everyalt-review-title-save').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			var mediaId = parseInt(btn.getAttribute('data-media-id'), 10);
+			var item = btn.closest('.everyalt-review-title-item');
+			var textarea = item ? item.querySelector('.everyalt-review-title-field') : null;
+			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
+			var title = textarea ? textarea.value : '';
+			btn.disabled = true;
+			request('POST', '/everyalt-api/v1/save_title', {
+				media_id: mediaId,
+				title: title
+			})
+				.then(function() {
+					btn.disabled = false;
+					if (statusEl) {
+						statusEl.textContent = 'Saved!';
+						statusEl.className = 'everyalt-review-status success';
+						setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
+					}
+				})
+				.catch(function(err) {
+					btn.disabled = false;
+					if (statusEl) {
+						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Save failed');
+						statusEl.className = 'everyalt-review-status error';
+					}
+				});
+		});
+	});
+
+	// Review Image Titles: Regenerate title (AJAX)
+	document.querySelectorAll('.everyalt-review-title-regenerate').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			var mediaId = parseInt(btn.getAttribute('data-media-id'), 10);
+			var item = btn.closest('.everyalt-review-title-item');
+			var textarea = item ? item.querySelector('.everyalt-review-title-field') : null;
+			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
+			btn.disabled = true;
+			if (statusEl) statusEl.textContent = '';
+			request('POST', '/everyalt-api/v1/bulk_generate_title', { media_id: mediaId })
+				.then(function(data) {
+					btn.disabled = false;
+					if (data && data.success && data.title !== undefined) {
+						if (textarea) textarea.value = data.title;
+						if (statusEl) {
+							statusEl.textContent = 'Regenerated!';
+							statusEl.className = 'everyalt-review-status success';
+							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
+						}
+					} else {
+						if (statusEl) {
+							statusEl.textContent = 'Error: ' + (data && data.message ? data.message : 'Regenerate failed');
+							statusEl.className = 'everyalt-review-status error';
+						}
+					}
+				})
+				.catch(function(err) {
+					btn.disabled = false;
+					if (statusEl) {
+						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Request failed');
+						statusEl.className = 'everyalt-review-status error';
+					}
+				});
+		});
+	});
 })();
