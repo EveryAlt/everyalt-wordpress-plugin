@@ -24,20 +24,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 			<?php
 			echo wp_kses(
 				sprintf(
-					/* translators: 1: opening link to hdc.net, 2: closing link tag */
-					__( 'EveryAlt is a free, open-source project created by %1$sHDC%2$s, a web dev firm for high-stakes projects and AI builds.', 'everyalt' ),
-					'<a href="' . esc_url( 'https://hdc.net' ) . '" target="_blank" rel="noopener noreferrer">',
-					'</a>'
-				),
-				array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) )
-			);
-			?>
-			</p><p>
-			<?php
-			echo wp_kses(
-				sprintf(
-					/* translators: 1: opening link to everyalt.com, 2: closing link tag */
-					__( 'EveryAlt also has a free Chrome extension and Shopify app. Check out our %1$sDigital Agency Plan%2$s if you manage lots of sites and want to set up limits and permissions for your clients or team.', 'everyalt' ),
+					/* translators: 1: opening link to everyalt.com, 2: closing link tag, 3: opening link to hdc.net, 4: closing link tag */
+					__( '%1$sEveryAlt%2$s is a free, open-source project created by %3$sHDC%4$s, a web dev firm for high-stakes projects and AI builds.', 'everyalt' ),
 					'<a href="' . esc_url( 'https://everyalt.com' ) . '" target="_blank" rel="noopener noreferrer">',
 					'</a>',
 					'<a href="' . esc_url( 'https://hdc.net' ) . '" target="_blank" rel="noopener noreferrer">',
