@@ -11,6 +11,7 @@ dist/
 
 # Release zips (for GitHub Releases upload)
 everyalt-*.zip
+everyalt.zip
 
 # Local / env (if you ever add .env for local keys)
 .env
