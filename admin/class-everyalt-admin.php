@@ -203,6 +203,15 @@ class Every_Alt_Admin {
 	public $error;
 
 	/**
+	 * The hook suffix for the plugin's options page.
+	 *
+	 * @since    1.0.0
+	 * @access   public
+	 * @var      string|false    $plugin_screen_hook_suffix    The screen hook suffix returned by add_media_page().
+	 */
+	public $plugin_screen_hook_suffix;
+
+	/**
 	 * Initialize the class and set its properties.
 	 *
 	 * @since    1.0.0
