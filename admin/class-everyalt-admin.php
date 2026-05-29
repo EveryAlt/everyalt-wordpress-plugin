@@ -227,6 +227,19 @@ class Every_Alt_Admin {
 	}
 
 	/**
+	 * Build a cache-busting asset version: plugin version plus the file's last-modified time.
+	 * Ensures browsers fetch updated CSS/JS even when the plugin version is unchanged.
+	 *
+	 * @param string $relative_path Path to the asset relative to the admin directory (e.g. 'js/everyalt-admin-simple.js').
+	 * @return string
+	 */
+	private function every_alt_asset_version( $relative_path ) {
+		$full = plugin_dir_path( __FILE__ ) . ltrim( $relative_path, '/' );
+		$mtime = file_exists( $full ) ? filemtime( $full ) : false;
+		return $mtime ? $this->version . '.' . $mtime : $this->version;
+	}
+
+	/**
 	 * Register the stylesheets for the admin area.
 	 *
 	 * @since    1.0.0
@@ -235,7 +248,7 @@ class Every_Alt_Admin {
 		// Only load our minimal admin CSS on plugin pages (no wp-components).
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
 		if ( $page === 'everyalt' ) {
-			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array(), $this->version, 'all' );
+			wp_enqueue_style( $this->plugin_name, plugin_dir_url( __FILE__ ) . 'css/everyalt-admin.css', array(), $this->every_alt_asset_version( 'css/everyalt-admin.css' ), 'all' );
 		}
 	}
 
@@ -249,7 +262,7 @@ class Every_Alt_Admin {
 				$this->plugin_name,
 				plugin_dir_url( __FILE__ ) . 'js/everyalt-admin-simple.js',
 				array( 'jquery' ),
-				$this->version,
+				$this->every_alt_asset_version( 'js/everyalt-admin-simple.js' ),
 				true
 			);
 			wp_localize_script( $this->plugin_name, 'everyaltAdmin', array(
@@ -275,7 +288,7 @@ class Every_Alt_Admin {
 			$this->plugin_name . '-gutenberg-image',
 			plugin_dir_url( __FILE__ ) . 'js/everyalt-gutenberg-button.js',
 			array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-hooks', 'wp-api-fetch' ),
-			$this->version,
+			$this->every_alt_asset_version( 'js/everyalt-gutenberg-button.js' ),
 			true
 		);
 	}
@@ -308,7 +321,7 @@ class Every_Alt_Admin {
 			$this->plugin_name . '-media',
 			plugin_dir_url( __FILE__ ) . 'js/everyalt-media-simple.js',
 			array( 'jquery' ),
-			$this->version,
+			$this->every_alt_asset_version( 'js/everyalt-media-simple.js' ),
 			true
 		);
 		wp_localize_script( $this->plugin_name . '-media', 'everyaltMedia', array(
@@ -474,27 +487,100 @@ class Every_Alt_Admin {
 			return true;
 		}
 
+		// A WordPress-appended duplicate counter, e.g. "name (1)", is a strong signal of an untouched upload.
+		if ( preg_match( '/\s*\(\d+\)$/', $title ) ) {
+			return true;
+		}
+		// Strip that suffix before further analysis.
+		$work = trim( preg_replace( '/\s*\(\d+\)$/', '', $title ) );
+
 		$normalize = function ( $s ) {
 			$s = strtolower( (string) $s );
-			$s = preg_replace( '/[_\-\s]+/', ' ', $s );
-			return trim( $s );
+			$s = preg_replace( '/[^a-z0-9]+/', ' ', $s );
+			return trim( preg_replace( '/\s+/', ' ', $s ) );
 		};
 
-		// Primary signal: title matches the uploaded filename (without extension).
+		// Primary signal: title matches the uploaded filename (without extension), ignoring punctuation.
 		$file = get_attached_file( $attachment_id );
 		if ( $file ) {
 			$base = pathinfo( $file, PATHINFO_FILENAME );
-			if ( $normalize( $title ) === $normalize( $base ) ) {
+			if ( $normalize( $work ) === $normalize( $base ) ) {
 				return true;
 			}
 		}
 
-		// Secondary signal: common camera / screenshot default filenames.
-		if ( preg_match( '/^(img|dsc|dscn|dscf|pxl|gopr|mvimg|screenshot|screen[ _-]?shot|scan|capture|untitled|photo|image|wa)[ _-]?\d+/i', $title ) ) {
+		// Underscores almost never appear in human-written titles (but are common in filenames,
+		// e.g. "08_43_43" or "DhC5sDlzRlewkGMANuI5_consultancy").
+		if ( strpos( $work, '_' ) !== false ) {
 			return true;
 		}
 
+		// Timestamp pattern like 08_43_43 / 08-43-43 / 08:43:43.
+		if ( preg_match( '/\d{1,2}[_:\-]\d{2}[_:\-]\d{2}/', $title ) ) {
+			return true;
+		}
+
+		$has_whitespace = preg_match( '/\s/', $work );
+
+		// Slug-style: hyphen-joined word characters with no spaces at all
+		// (e.g. "consultancy-course-card", "christina-wocintechchat-com-...-unsplash").
+		if ( ! $has_whitespace && preg_match( '/[A-Za-z0-9]-[A-Za-z0-9]/', $work ) ) {
+			return true;
+		}
+
+		// Camera/phone default filenames where the prefix runs straight into digits (e.g. "DSC0099", "IMG2345").
+		if ( preg_match( '/^(img|dsc|dscn|dscf|pxl|gopr|mvimg|p|dji)[ _-]?\d{3,}/i', $work ) ) {
+			return true;
+		}
+
+		// Common machine/stock/AI/camera title prefixes.
+		if ( preg_match( '/^(chatgpt image|dall[\s\-]?e|midjourney|stable diffusion|screenshot|screen[ _-]?shot|img|image|dsc|dscn|dscf|pxl|gopr|mvimg|scan|capture|untitled|photo|pexels|unsplash|istock|shutterstock|getty)\b/i', $work ) ) {
+			return true;
+		}
+
+		// Random-looking alphanumeric token, e.g. stock-photo IDs ("RMweULmCYxM") or upload hashes ("DhC5sDlzRlewkGMANuI5").
+		foreach ( preg_split( '/\s+/', $work ) as $token ) {
+			if ( $this->every_alt_token_looks_random( $token ) ) {
+				return true;
+			}
+		}
+
 		return false;
+	}
+
+	/**
+	 * Heuristic: does a token look like a random ID/hash rather than a real word?
+	 *
+	 * @param string $token
+	 * @return bool
+	 */
+	private function every_alt_token_looks_random( $token ) {
+		$len = strlen( $token );
+		if ( $len < 8 ) {
+			return false;
+		}
+		if ( ! preg_match( '/^[A-Za-z0-9]+$/', $token ) ) {
+			return false;
+		}
+		$has_upper = preg_match( '/[A-Z]/', $token );
+		$has_lower = preg_match( '/[a-z]/', $token );
+		$has_digit = preg_match( '/[0-9]/', $token );
+
+		// A long token mixing digits with letters is almost always an ID/hash.
+		if ( $has_digit && ( $has_upper || $has_lower ) ) {
+			return true;
+		}
+
+		// Many case flips within one token (e.g. "RMweULmCYxM") indicate gibberish, not a word.
+		$transitions = 0;
+		for ( $i = 1; $i < $len; $i++ ) {
+			$a = $token[ $i - 1 ];
+			$b = $token[ $i ];
+			if ( ctype_alpha( $a ) && ctype_alpha( $b ) && ( ctype_upper( $a ) !== ctype_upper( $b ) ) ) {
+				$transitions++;
+			}
+		}
+		return $transitions >= 4;
 	}
 
 	private function every_alt_is_valid_image($media_id) {
