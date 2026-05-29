@@ -9,6 +9,9 @@ node_modules/
 vendor/
 dist/
 
+# Build output (zips produced by build.sh)
+/builds/
+
 # Release zips (for GitHub Releases upload)
 everyalt-*.zip
 everyalt.zip
