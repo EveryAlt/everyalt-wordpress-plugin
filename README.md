@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/EveryAlt-1.0-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.0" />
+  <img src="https://img.shields.io/badge/EveryAlt-1.0.2-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.0.2" />
   <img src="https://img.shields.io/badge/WordPress-5.5%2B-21759b?style=flat-square&logo=wordpress" alt="WordPress" />
   <img src="https://img.shields.io/badge/PHP-7.0%2B-777BB4?style=flat-square&logo=php" alt="PHP" />
   <img src="https://img.shields.io/badge/license-GPLv2-green?style=flat-square" alt="License" />
@@ -38,8 +38,9 @@ We don’t charge. We don’t sit in the middle. You use **your** OpenAI key. Ev
 ## 🚀 What you can do
 
 - **Auto-generate on upload** — New images get alt text as soon as they hit the Media Library.
-- **Bulk generate** — Fix hundreds of images without alt text in one go.
-- **Review & edit** — See everything that already has alt text; edit or regenerate anytime.
+- **AI image titles** — Generate descriptive WordPress image titles too, not just alt text — automatically on upload, in bulk, or one at a time.
+- **Bulk generate** — Fix hundreds of images without alt text (or still named like their raw filename) in one go.
+- **Review & edit** — See everything that already has alt text or a title; edit or regenerate anytime.
 - **In the block editor** — Generate or regenerate alt text right from the Image block.
 - **On the media screen** — Button next to the alt field for single images.
 - **Logs & export** — See what ran, what cost what, and export as CSV.
@@ -93,6 +94,27 @@ EveryAlt is translation-ready. These languages are included:
 | Dutch (Nederlands) | nl_NL |
 
 The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages/` so you can add or update translations.
+
+---
+
+## 📝 Changelog
+
+### 1.0.2
+- **New — AI image titles.** EveryAlt now writes descriptive WordPress image **titles**, not just alt text:
+  - Optional **Automatically generate image titles when images are uploaded** toggle in Settings.
+  - **Bulk Image Title Generator** tab — finds images whose title is still the raw upload filename (e.g. `IMG_1234`, stock-photo IDs, `ChatGPT Image …`) and titles them in bulk.
+  - **Review Image Titles** tab — edit, save, or regenerate titles for images that already have a custom one.
+  - A dedicated, editable **image title prompt** tuned for short titles.
+- **Improved** detection of filename-style titles (underscores, hyphen slugs, duplicate `(1)` suffixes, camera/screenshot/stock/AI patterns, and random ID tokens) so the right images get surfaced for retitling.
+- **Fixed** a PHP 8.2+ deprecation notice caused by a dynamic property (`$plugin_screen_hook_suffix`).
+- **Fixed** admin CSS/JS caching — assets are now versioned by file-modification time, so updates load without a manual hard refresh.
+- **Changed** the admin intro notice: simplified the copy and linked the EveryAlt name to [everyalt.com](https://everyalt.com).
+
+### 1.0.1
+- Added an automatic update checker so new releases appear in your WordPress dashboard.
+
+### 1.0.0
+- Initial release: AI alt text generation (auto-on-upload, bulk, review/edit, block-editor and media-screen buttons, logs with CSV export), encrypted OpenAI key storage, and translations for Spanish, Italian, Japanese, French, Brazilian Portuguese, German, and Dutch.
 
 ---
 
