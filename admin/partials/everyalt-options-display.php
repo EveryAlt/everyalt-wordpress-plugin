@@ -39,6 +39,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					/* translators: 1: opening link to everyalt.com, 2: closing link tag */
 					__( 'EveryAlt also has a free Chrome extension and Shopify app. Check out our %1$sDigital Agency Plan%2$s if you manage lots of sites and want to set up limits and permissions for your clients or team.', 'everyalt' ),
 					'<a href="' . esc_url( 'https://everyalt.com' ) . '" target="_blank" rel="noopener noreferrer">',
+					'</a>',
+					'<a href="' . esc_url( 'https://hdc.net' ) . '" target="_blank" rel="noopener noreferrer">',
 					'</a>'
 				),
 				array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) )
