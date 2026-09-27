@@ -171,6 +171,7 @@ class Every_Alt {
 
 		//settings
 		$this->loader->add_action( 'admin_menu', $plugin_admin, 'add_options_page' );
+		$this->loader->add_filter( 'admin_title', $plugin_admin, 'every_alt_admin_title', 10, 2 );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'register_setting' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_save_settings' );
 		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_maybe_export_logs_csv', 5 );

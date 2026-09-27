@@ -409,7 +409,7 @@ class Every_Alt_Admin {
 			wp_enqueue_script(
 				$this->plugin_name,
 				plugin_dir_url( __FILE__ ) . 'js/everyalt-admin-simple.js',
-				array( 'jquery' ),
+				array( 'jquery', 'wp-a11y' ),
 				$this->every_alt_asset_version( 'js/everyalt-admin-simple.js' ),
 				true
 			);
@@ -429,6 +429,8 @@ class Every_Alt_Admin {
 					'queueNothing'     => __( 'Those images were already queued.', 'everyalt' ),
 					'queueCleared'     => __( 'Queue cleared.', 'everyalt' ),
 					'decorative'       => __( 'Marked as decorative (alt text left empty on purpose)', 'everyalt' ),
+					/* translators: %d: number of images finished in this batch */
+					'queueBatchDone'   => __( '%d finished.', 'everyalt' ),
 					'error'            => __( 'Error', 'everyalt' ),
 					'errorPrefix'      => __( 'Error:', 'everyalt' ),
 					'requestFailed'    => __( 'Request failed', 'everyalt' ),
@@ -508,7 +510,7 @@ class Every_Alt_Admin {
 		wp_enqueue_script(
 			$this->plugin_name . '-media',
 			plugin_dir_url( __FILE__ ) . 'js/everyalt-media-simple.js',
-			array( 'jquery' ),
+			array( 'jquery', 'wp-a11y' ),
 			$this->every_alt_asset_version( 'js/everyalt-media-simple.js' ),
 			true
 		);
@@ -1066,13 +1068,55 @@ class Every_Alt_Admin {
 	
 
 	/**
+	 * The admin page's tabs, slug => label.
+	 *
+	 * @return array
+	 */
+	public static function tabs() {
+		return array(
+			'settings'     => __( 'Settings', 'everyalt' ),
+			'bulk'         => __( 'Bulk Alt Text Generator', 'everyalt' ),
+			'review'       => __( 'Review Alt Text', 'everyalt' ),
+			'bulk_title'   => __( 'Bulk Image Title Generator', 'everyalt' ),
+			'review_title' => __( 'Review Image Titles', 'everyalt' ),
+			'logs'         => __( 'Logs', 'everyalt' ),
+		);
+	}
+
+	/**
+	 * Tab being viewed on the EveryAlt page (defaults to settings).
+	 *
+	 * @return string
+	 */
+	public static function current_tab() {
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : '';
+		return array_key_exists( $tab, self::tabs() ) ? $tab : 'settings';
+	}
+
+	/**
+	 * Filter: admin_title. Put the tab name in the browser title, so each tab has a distinct page
+	 * title (WCAG 2.4.2), e.g. "Logs ‹ EveryAlt ‹ My Site — WordPress".
+	 *
+	 * @param string $admin_title
+	 * @param string $title
+	 * @return string
+	 */
+	public function every_alt_admin_title( $admin_title, $title ) {
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+		if ( $page !== $this->plugin_name ) {
+			return $admin_title;
+		}
+		$tabs = self::tabs();
+		return $tabs[ self::current_tab() ] . ' &lsaquo; ' . $admin_title;
+	}
+
+	/**
 	 * Render the options page for plugin
 	 *
 	 * @since  1.0.0
 	 */
 	public function display_options_page() {
-		$allowed_tabs = array( 'settings', 'bulk', 'review', 'bulk_title', 'review_title', 'logs' );
-		$tab = isset( $_GET['tab'] ) && in_array( $_GET['tab'], $allowed_tabs, true ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'settings';
+		$tab = self::current_tab();
 		$active = $tab;
 
 
