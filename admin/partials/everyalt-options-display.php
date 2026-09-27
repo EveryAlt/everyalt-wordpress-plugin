@@ -313,9 +313,10 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					?>
-					<li class="everyalt-bulk-item" data-media-id="<?php echo $aid; ?>">
+					<li class="everyalt-bulk-item everyalt-bulk-card" data-media-id="<?php echo $aid; ?>">
 						<label>
 							<input type="checkbox" class="everyalt-bulk-checkbox" value="<?php echo $aid; ?>">
+							<span class="screen-reader-text"><?php echo esc_html( sprintf( /* translators: %s: image title */ __( 'Select “%s”', 'everyalt' ), get_the_title( $aid ) ) ); ?></span>
 							<span class="everyalt-bulk-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
 						</label>
 						<?php
@@ -406,9 +407,10 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					?>
-					<li class="everyalt-bulk-title-item" data-media-id="<?php echo $aid; ?>">
+					<li class="everyalt-bulk-title-item everyalt-bulk-card" data-media-id="<?php echo $aid; ?>">
 						<label>
 							<input type="checkbox" class="everyalt-bulk-title-checkbox" value="<?php echo $aid; ?>">
+							<span class="screen-reader-text"><?php echo esc_html( sprintf( /* translators: %s: image title */ __( 'Select “%s”', 'everyalt' ), get_the_title( $aid ) ) ); ?></span>
 							<span class="everyalt-bulk-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
 						</label>
 						<?php

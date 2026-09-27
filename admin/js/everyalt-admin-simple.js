@@ -86,17 +86,31 @@
 		});
 	});
 
+	// Bulk tabs: highlight selected image cards. Select all/none change checkboxes without a change
+	// event, so they call syncCards() themselves.
+	function syncCards() {
+		document.querySelectorAll('.everyalt-bulk-card').forEach(function(card) {
+			var cb = card.querySelector('input[type="checkbox"]');
+			card.classList.toggle('is-selected', !!(cb && cb.checked));
+		});
+	}
+	document.addEventListener('change', function(e) {
+		if (e.target && e.target.closest && e.target.closest('.everyalt-bulk-card')) syncCards();
+	});
+
 	// Bulk: Select all / Select none
 	var selectAllBtn = document.getElementById('everyalt-bulk-select-all');
 	var selectNoneBtn = document.getElementById('everyalt-bulk-select-none');
 	if (selectAllBtn) {
 		selectAllBtn.addEventListener('click', function() {
-			document.querySelectorAll('.everyalt-bulk-checkbox').forEach(function(cb) { cb.checked = true; });
+			document.querySelectorAll('.everyalt-bulk-checkbox:not(:disabled)').forEach(function(cb) { cb.checked = true; });
+			syncCards();
 		});
 	}
 	if (selectNoneBtn) {
 		selectNoneBtn.addEventListener('click', function() {
 			document.querySelectorAll('.everyalt-bulk-checkbox').forEach(function(cb) { cb.checked = false; });
+			syncCards();
 		});
 	}
 
@@ -148,10 +162,9 @@
 			}
 			var cb = itemEl.querySelector('input[type="checkbox"]');
 			if (cb && r.success) { cb.checked = false; cb.disabled = true; }
-			if (r.success) {
-				var label = itemEl.querySelector('label');
-				if (label) label.style.opacity = '0.5';
-			}
+			itemEl.classList.toggle('is-done', !!r.success);
+			itemEl.classList.toggle('is-error', !r.success);
+			itemEl.classList.remove('is-selected');
 		}
 		if (queueLog) {
 			var li = document.createElement('li');
@@ -310,12 +323,14 @@
 	var titleSelectNoneBtn = document.getElementById('everyalt-bulk-title-select-none');
 	if (titleSelectAllBtn) {
 		titleSelectAllBtn.addEventListener('click', function() {
-			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.checked = true; });
+			document.querySelectorAll('.everyalt-bulk-title-checkbox:not(:disabled)').forEach(function(cb) { cb.checked = true; });
+			syncCards();
 		});
 	}
 	if (titleSelectNoneBtn) {
 		titleSelectNoneBtn.addEventListener('click', function() {
 			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.checked = false; });
+			syncCards();
 		});
 	}
 
