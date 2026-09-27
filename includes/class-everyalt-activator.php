@@ -23,33 +23,16 @@
 class Every_Alt_Activator {
 
 	/**
-	 * Short Description. (use period)
-	 *
-	 * Long Description.
+	 * Set one-time flags for the post-activation redirect and the auto-generate default.
 	 *
 	 * @since    1.0.0
 	 */
 	public static function activate() {
-		global $wpdb;
-		$table_name = $wpdb->prefix . 'every_alt_logs';
-		$charset_collate = $wpdb->get_charset_collate();
-		// Check if the table already exists
-		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table_name ) ) !== $table_name ) {
-			$sql = "CREATE TABLE $table_name (
-				id mediumint(9) NOT NULL AUTO_INCREMENT,
-				media_id mediumint(9) NOT NULL,
-				alt_text text NOT NULL,
-				created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-				PRIMARY KEY  (id)
-			) $charset_collate;";
-			require_once( ABSPATH . 'wp-admin/includes/upgrade.php' );
-			dbDelta( $sql );
+		add_option( 'every_alt_do_activation_redirect', true );
+		// Auto-generate starts checked until the first API key is saved (see Every_Alt_Admin::every_alt_save_settings()).
+		if ( ! get_option( 'every_alt_openai_key' ) && ! get_option( 'every_alt_gemini_key' ) && ! get_option( 'every_alt_deepinfra_key' ) ) {
+			add_option( 'every_alt_do_auto_default', true );
 		}
-
-		add_option('every_alt_do_activation_redirect', true);
-		add_option('every_alt_do_auto_default', true);
-
-		
 	}
 
 }

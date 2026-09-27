@@ -1,7 +1,8 @@
 <?php
 /**
- * Generate alt text via OpenAI Vision API using image as base64 (medium size).
- * No third-party server; works for localhost and htpasswd-protected sites.
+ * Generate alt text via the selected provider's OpenAI-compatible vision API (OpenAI, Gemini, or
+ * DeepInfra; see Every_Alt_Providers), sending the image as base64 (medium size).
+ * No image URL is fetched by the provider, so this works for localhost and htpasswd-protected sites.
  *
  * @package EveryAlt
  */
@@ -12,77 +13,77 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Every_Alt_OpenAI {
 
-	const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
-	const OPENAI_MODELS_URL = 'https://api.openai.com/v1/models';
-
 	const DEFAULT_PROMPT = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
 
 	const DEFAULT_TITLE_PROMPT = 'Write a short, descriptive title for this image, suitable for a WordPress image title (about 3 to 6 words, Title Case). Do not use quotation marks, a trailing period, or phrases like "This image shows". Output only the title, nothing else.';
 
-	// Reasoning models (e.g. gpt-5-nano) use tokens for internal "thinking"; we need enough for reasoning + actual output.
+	// Reasoning models use tokens for internal "thinking"; we need enough for reasoning + actual output.
 	const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
 
-	/** Filter: change the model used in the API call. Default 'gpt-5-nano'. */
-	const FILTER_MODEL = 'everyalt_openai_model';
+	/** Filter: change the model ID sent to the provider. Args: ( string $model_id, string $model_slug ). */
+	const FILTER_MODEL = 'everyalt_model';
 
-	/** Filter: input token price in dollars per 1M tokens. Default 0.05 (gpt-5-nano). */
+	/** Filter: input token price in dollars per 1M tokens. Args: ( float $price, string $model_slug ). */
 	const FILTER_INPUT_PRICE_PER_MILLION = 'everyalt_input_token_price_per_million';
 
-	/** Filter: output token price in dollars per 1M tokens. Default 0.40 (gpt-5-nano). */
+	/** Filter: output token price in dollars per 1M tokens. Args: ( float $price, string $model_slug ). */
 	const FILTER_OUTPUT_PRICE_PER_MILLION = 'everyalt_output_token_price_per_million';
-
-	const DEFAULT_INPUT_PRICE_PER_MILLION  = 0.05;
-	const DEFAULT_OUTPUT_PRICE_PER_MILLION = 0.40;
 
 	/** @var string */
 	private $api_key;
 
-	/** @var string Model name (e.g. gpt-4o-mini or gpt-5-nano). */
+	/** @var array Model definition from Every_Alt_Providers::models(), with 'slug'. */
+	private $model_def;
+
+	/** @var array Provider definition from Every_Alt_Providers::providers(). */
+	private $provider_def;
+
+	/** @var string Model ID sent in the request (e.g. gpt-5.4-nano). */
 	private $model;
 
 	/**
-	 * Validate an OpenAI API key by making a lightweight request.
+	 * Validate an OpenAI API key. Kept for backward compatibility; see Every_Alt_Providers::validate_key().
 	 *
 	 * @param string $api_key The key to validate.
 	 * @return bool True if the key is valid and has API access.
 	 */
 	public static function validate_api_key( $api_key ) {
-		if ( ! is_string( $api_key ) || trim( $api_key ) === '' ) {
-			return false;
-		}
-		$response = wp_remote_get(
-			self::OPENAI_MODELS_URL,
-			array(
-				'timeout' => 15,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . trim( $api_key ),
-				),
-			)
-		);
-		if ( is_wp_error( $response ) ) {
-			return false;
-		}
-		$code = wp_remote_retrieve_response_code( $response );
-		return $code >= 200 && $code < 300;
+		return Every_Alt_Providers::validate_key( 'openai', $api_key );
 	}
 
-	public function __construct( $api_key ) {
-		$this->api_key = $api_key;
-		$this->model   = apply_filters( self::FILTER_MODEL, 'gpt-5-nano' );
+	/**
+	 * @param string     $api_key   Key for the model's provider.
+	 * @param array|null $model_def Model definition (with 'slug'); defaults to the model selected in Settings.
+	 */
+	public function __construct( $api_key, $model_def = null ) {
+		$this->api_key      = $api_key;
+		$this->model_def    = is_array( $model_def ) ? $model_def : Every_Alt_Providers::selected_model();
+		$this->provider_def = Every_Alt_Providers::provider( $this->model_def['provider'] );
+		$this->model        = apply_filters( self::FILTER_MODEL, $this->model_def['model'], $this->model_def['slug'] );
+	}
+
+	/**
+	 * Display name of the model in use, e.g. "GPT-5.4 nano (OpenAI)", for logs.
+	 *
+	 * @return string
+	 */
+	public function get_model_label() {
+		return $this->model_def['label'] . ' (' . $this->provider_def['label'] . ')';
 	}
 
 	/**
 	 * Get the file path for the best available image size (prefer medium to save tokens).
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Attachment metadata to use instead of the saved copy (during upload it is not saved yet).
 	 * @return string|null Full path or null.
 	 */
-	private function get_image_path_for_vision( $attachment_id ) {
+	public static function get_image_path_for_vision( $attachment_id, $metadata = null ) {
 		$file = get_attached_file( $attachment_id );
 		if ( ! $file || ! is_readable( $file ) ) {
 			return null;
 		}
-		$meta = wp_get_attachment_metadata( $attachment_id );
+		$meta = is_array( $metadata ) ? $metadata : wp_get_attachment_metadata( $attachment_id );
 		if ( empty( $meta['sizes'] ) ) {
 			return $file;
 		}
@@ -119,17 +120,18 @@ class Every_Alt_OpenAI {
 	}
 
 	/**
-	 * Generate alt text for an attachment using OpenAI Vision. Image is sent as base64.
+	 * Generate alt text for an attachment using the selected vision model. Image is sent as base64.
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { alt: string|null, error: string|null, error_detail: string|null } Always returns object; check ->error for failure.
 	 */
-	public function generate_alt( $attachment_id ) {
+	public function generate_alt( $attachment_id, $metadata = null ) {
 		$saved_prompt = get_option( 'every_alt_vision_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
 		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
 
-		$result = $this->generate_text( $attachment_id, $prompt );
+		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
 		// Map shared 'text' field onto 'alt' for backward compatibility.
 		$result->alt = isset( $result->text ) ? $result->text : null;
@@ -138,17 +140,18 @@ class Every_Alt_OpenAI {
 	}
 
 	/**
-	 * Generate a short image title for an attachment using OpenAI Vision. Image is sent as base64.
+	 * Generate a short image title for an attachment using the selected vision model. Image is sent as base64.
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { title: string|null, error: string|null, error_detail: string|null, usage: string, cost: string } Always returns object; check ->error for failure.
 	 */
-	public function generate_title( $attachment_id ) {
+	public function generate_title( $attachment_id, $metadata = null ) {
 		$saved_prompt = get_option( 'every_alt_title_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_TITLE_PROMPT;
 		$prompt       = apply_filters( 'everyalt_title_prompt', $prompt );
 
-		$result = $this->generate_text( $attachment_id, $prompt );
+		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
 		$result->title = isset( $result->text ) ? $result->text : null;
 		unset( $result->text );
@@ -156,14 +159,15 @@ class Every_Alt_OpenAI {
 	}
 
 	/**
-	 * Shared core: send the image plus a text prompt to OpenAI Vision and return the text response.
+	 * Shared core: send the image plus a text prompt to the selected vision model and return the text response.
 	 *
 	 * @param int    $attachment_id
-	 * @param string $prompt        Instruction sent with the image.
+	 * @param string     $prompt        Instruction sent with the image.
+	 * @param array|null $metadata      Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { text: string|null, error: string|null, error_detail: string|null, usage: string, cost: string }
 	 */
-	private function generate_text( $attachment_id, $prompt ) {
-		$path = $this->get_image_path_for_vision( $attachment_id );
+	private function generate_text( $attachment_id, $prompt, $metadata = null ) {
+		$path = self::get_image_path_for_vision( $attachment_id, $metadata );
 		if ( ! $path ) {
 			return (object) array( 'text' => null, 'error' => 'Could not get image path for attachment.', 'error_detail' => '', 'usage' => '', 'cost' => '' );
 		}
@@ -198,10 +202,18 @@ class Every_Alt_OpenAI {
 		$saved_max   = get_option( 'every_alt_max_completion_tokens', '' );
 		$max_tokens  = $saved_max !== '' ? max( 1, (int) $saved_max ) : self::DEFAULT_MAX_COMPLETION_TOKENS;
 		$max_tokens  = apply_filters( 'everyalt_max_completion_tokens', $max_tokens );
+		if ( ! empty( $this->provider_def['max_tokens_cap'] ) ) {
+			$max_tokens = min( (int) $max_tokens, (int) $this->provider_def['max_tokens_cap'] );
+		}
+		$image_url = array( 'url' => $data_url );
+		if ( ! empty( $this->provider_def['image_detail'] ) ) {
+			// OpenAI-only hint: low detail keeps image input tokens (and cost) small; plenty for alt text.
+			$image_url['detail'] = $this->provider_def['image_detail'];
+		}
 		$body = array(
-			'model'                   => $this->model,
-			'max_completion_tokens'   => (int) $max_tokens,
-			'messages'   => array(
+			'model'                            => $this->model,
+			$this->provider_def['token_param'] => (int) $max_tokens,
+			'messages'                         => array(
 				array(
 					'role'    => 'user',
 					'content' => array(
@@ -211,18 +223,17 @@ class Every_Alt_OpenAI {
 						),
 						array(
 							'type'      => 'image_url',
-							'image_url' => array(
-								'url'    => $data_url,
-								'detail' => 'low',
-							),
+							'image_url' => $image_url,
 						),
 					),
 				),
 			),
 		);
 
+		$body = array_merge( $body, $this->model_def['params'] );
+
 		$response = wp_remote_post(
-			self::OPENAI_URL,
+			$this->provider_def['endpoint'],
 			array(
 				'timeout' => 60,
 				'headers' => array(
@@ -256,7 +267,7 @@ class Every_Alt_OpenAI {
 			}
 			return (object) array(
 				'text'         => null,
-				'error'        => 'OpenAI API returned ' . $code,
+				'error'        => $this->provider_def['label'] . ' API returned ' . $code,
 				'error_detail' => $detail,
 				'usage'        => $usage,
 				'cost'         => $cost,
@@ -293,7 +304,7 @@ class Every_Alt_OpenAI {
 		if ( $text === '' ) {
 			return (object) array(
 				'text'         => null,
-				'error'        => 'OpenAI response had no content.',
+				'error'        => $this->provider_def['label'] . ' response had no content.',
 				'error_detail' => $body_raw,
 				'usage'        => $usage,
 				'cost'         => $cost,
@@ -347,8 +358,8 @@ class Every_Alt_OpenAI {
 		if ( $p === 0 && $c === 0 ) {
 			return '';
 		}
-		$input_price  = (float) apply_filters( self::FILTER_INPUT_PRICE_PER_MILLION, self::DEFAULT_INPUT_PRICE_PER_MILLION );
-		$output_price = (float) apply_filters( self::FILTER_OUTPUT_PRICE_PER_MILLION, self::DEFAULT_OUTPUT_PRICE_PER_MILLION );
+		$input_price  = (float) apply_filters( self::FILTER_INPUT_PRICE_PER_MILLION, $this->model_def['input_price'], $this->model_def['slug'] );
+		$output_price = (float) apply_filters( self::FILTER_OUTPUT_PRICE_PER_MILLION, $this->model_def['output_price'], $this->model_def['slug'] );
 		$cost_dollars = ( $p * $input_price / 1000000 ) + ( $c * $output_price / 1000000 );
 		$cost_cents   = $cost_dollars * 100;
 		return number_format( $cost_cents, 4 ) . '¢';

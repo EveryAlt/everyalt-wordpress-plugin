@@ -14,6 +14,18 @@
 	var PanelBody = wp.components.PanelBody;
 	var Button = wp.components.Button;
 
+	var i18n = (typeof everyaltBlock !== 'undefined' && everyaltBlock.i18n) || {};
+	function t(key, fallback) { return i18n[key] || fallback; }
+
+	// Show a dismissible snackbar/notice in the editor; failures used to be swallowed silently.
+	function notify(type, message) {
+		if (!wp.data || !wp.data.dispatch) return;
+		var notices = wp.data.dispatch('core/notices');
+		if (!notices) return;
+		var create = type === 'error' ? notices.createErrorNotice : notices.createSuccessNotice;
+		create(message, { id: 'everyalt-generate', type: 'snackbar', isDismissible: true });
+	}
+
 	function EveryAltImageEdit(BlockEdit) {
 		return function (props) {
 			if (props.name !== 'core/image') {
@@ -33,15 +45,18 @@
 				wp.apiFetch({
 					path: 'everyalt-api/v1/bulk_generate_alt',
 					method: 'POST',
-					data: { media_id: attachmentId },
-					headers: { 'Content-Type': 'application/json' }
+					data: { media_id: attachmentId }
 				}).then(function (res) {
 					setIsBusy(false);
 					if (res && res.success && res.alt_text) {
 						setAttributes({ alt: res.alt_text });
+						notify('success', t('generated', 'Alt text generated.'));
+					} else {
+						notify('error', (res && res.message) ? res.message : t('failed', 'Could not generate alt text.'));
 					}
-				}).catch(function () {
+				}).catch(function (err) {
 					setIsBusy(false);
+					notify('error', t('errorPrefix', 'Error:') + ' ' + ((err && err.message) ? err.message : t('failed', 'Could not generate alt text.')));
 				});
 			}
 
@@ -49,7 +64,7 @@
 				el(BlockEdit, props),
 				el(InspectorControls, { key: 'everyalt' },
 					el(PanelBody, {
-						title: 'EveryAlt',
+						title: t('panelTitle', 'EveryAlt'),
 						initialOpen: true,
 						className: 'everyalt-inspector-panel'
 					},
@@ -62,9 +77,9 @@
 								isBusy: isBusy,
 								disabled: isBusy,
 								style: { marginTop: '8px' }
-							}, 'Generate alt text with EveryAlt')
+							}, t('button', 'Generate alt text with EveryAlt'))
 							: el('p', { className: 'everyalt-gutenberg-help', style: { margin: 0, fontSize: '12px', color: '#757575' } },
-								'Select or upload an image to generate alt text.')
+								t('selectImage', 'Select or upload an image to generate alt text.'))
 					)
 				)
 			);

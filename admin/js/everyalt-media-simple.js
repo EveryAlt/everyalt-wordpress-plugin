@@ -8,6 +8,8 @@
 	var restUrl = (config.restUrl || '').replace(/\/$/, '');
 	var restNonce = config.restNonce || '';
 	var mediaId = config.mediaId || 0;
+	var i18n = config.i18n || {};
+	function t(key, fallback) { return i18n[key] || fallback; }
 
 	if (!restUrl || !mediaId) return;
 
@@ -17,7 +19,7 @@
 	var btn = document.createElement('button');
 	btn.type = 'button';
 	btn.className = 'button';
-	btn.textContent = 'Generate alt text with EveryAlt';
+	btn.textContent = t('button', 'Generate alt text with EveryAlt');
 	wrap.appendChild(btn);
 
 	var msg = document.createElement('p');
@@ -27,7 +29,7 @@
 
 	btn.addEventListener('click', function() {
 		btn.disabled = true;
-		msg.textContent = 'Generating…';
+		msg.textContent = t('generating', 'Generating…');
 		msg.className = 'everyalt-media-message';
 
 		fetch(restUrl + '/everyalt-api/v1/bulk_generate_alt', {
@@ -46,20 +48,20 @@
 				btn.disabled = false;
 				var success = data && data.success && data.alt_text;
 				if (success) {
-					msg.textContent = 'Alt text generated.';
+					msg.textContent = t('generated', 'Alt text generated.');
 					msg.className = 'everyalt-media-message notice notice-success';
 					var altField = document.getElementById('attachment_alt') || document.querySelector('textarea[name*="_wp_attachment_image_alt"]') || document.querySelector('input[name*="_wp_attachment_image_alt"]');
 					if (altField) {
 						altField.value = data.alt_text;
 					}
 				} else {
-					msg.textContent = (data && data.message) ? data.message : 'Could not generate alt text.';
+					msg.textContent = (data && data.message) ? data.message : t('failed', 'Could not generate alt text.');
 					msg.className = 'everyalt-media-message notice notice-error';
 				}
 			})
 			.catch(function(err) {
 				btn.disabled = false;
-				msg.textContent = 'Error: ' + (err.message || 'Request failed');
+				msg.textContent = t('errorPrefix', 'Error:') + ' ' + (err.message || t('failed', 'Could not generate alt text.'));
 				msg.className = 'everyalt-media-message notice notice-error';
 			});
 	});

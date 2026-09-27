@@ -116,6 +116,7 @@ class Every_Alt {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-admin.php';
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-encryption.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-providers.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-openai.php';
 
 		$this->loader = new Every_Alt_Loader();
@@ -162,11 +163,12 @@ class Every_Alt {
 		$this->loader->add_action( 'rest_api_init', $plugin_admin,'every_alt_custom_admin_endpoints' );
 		$this->loader->add_action( 'wp_ajax_everyalt_validate_key', $plugin_admin, 'ajax_validate_key' );
 
-		//auto: run after attachment metadata (and medium size) is saved, not on add_attachment
-		$this->loader->add_action( 'updated_post_meta', $plugin_admin, 'every_alt_maybe_auto_after_metadata', 10, 4 );
+		//auto: run once per upload, after all sub-sizes (incl. medium) are generated. Late priority so other plugins' image processing is done.
+		$this->loader->add_filter( 'wp_generate_attachment_metadata', $plugin_admin, 'every_alt_maybe_auto_on_generate_metadata', 99, 2 );
 
-		//delete logs
-		$this->loader->add_action('delete_attachment', $plugin_admin, 'every_alt_on_media_delete');
+		//upgrades and key health
+		$this->loader->add_action( 'admin_init', $plugin_admin, 'every_alt_maybe_upgrade' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'every_alt_key_decrypt_notice' );
 
 		//add alt from media page (button at end of right sidebar)
 		$this->loader->add_action('attachment_submitbox_misc_actions', $plugin_admin, 'every_alt_custom_button_to_media_edit_page');

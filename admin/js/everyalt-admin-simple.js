@@ -8,6 +8,8 @@
 	var restNonce = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.restNonce : '';
 	var ajaxUrl = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.ajaxUrl : '';
 	var validateKeyNonce = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.validateKeyNonce : '';
+	var i18n = (typeof everyaltAdmin !== 'undefined' && everyaltAdmin.i18n) || {};
+	function t(key, fallback) { return i18n[key] || fallback; }
 
 	function request(method, path, body) {
 		var url = restUrl.replace(/\/$/, '') + path;
@@ -27,12 +29,35 @@
 		});
 	}
 
-	// Validate API key (Settings tab)
-	var validateKeyBtn = document.getElementById('everyalt-validate-key');
-	if (validateKeyBtn) {
-		var resultEl = document.getElementById('everyalt-validate-result');
+	// Settings: show only the API key block for the selected model's provider.
+	var modelRadios = document.querySelectorAll('.everyalt-model-list input[type="radio"]');
+	function showProviderKey() {
+		var checked = document.querySelector('.everyalt-model-list input[type="radio"]:checked');
+		var provider = checked ? checked.getAttribute('data-provider') : '';
+		document.querySelectorAll('.everyalt-provider-key').forEach(function(block) {
+			block.classList.toggle('hidden', block.getAttribute('data-provider') !== provider);
+		});
+	}
+	if (modelRadios.length) {
+		modelRadios.forEach(function(radio) { radio.addEventListener('change', showProviderKey); });
+		showProviderKey();
+	}
+
+	// Validate API key (Settings tab), one button per provider.
+	document.querySelectorAll('.everyalt-validate-key').forEach(function(validateKeyBtn) {
+		var block = validateKeyBtn.closest('.everyalt-provider-key');
+		var resultEl = block ? block.querySelector('.everyalt-validate-result') : null;
+		var provider = validateKeyBtn.getAttribute('data-provider');
+		function showResult(ok, message) {
+			resultEl.style.display = 'block';
+			resultEl.className = 'everyalt-validate-result notice ' + (ok ? 'notice-success' : 'notice-error');
+			resultEl.textContent = '';
+			var p = document.createElement('p');
+			p.textContent = message;
+			resultEl.appendChild(p);
+		}
 		validateKeyBtn.addEventListener('click', function() {
-			var keyInput = document.getElementById('every_alt_openai_key');
+			var keyInput = block ? block.querySelector('input[type="password"]') : null;
 			var key = keyInput ? keyInput.value.trim() : '';
 			if (!resultEl) return;
 			resultEl.style.display = 'none';
@@ -41,6 +66,7 @@
 			var formData = new FormData();
 			formData.append('action', 'everyalt_validate_key');
 			formData.append('nonce', validateKeyNonce);
+			formData.append('provider', provider);
 			formData.append('key', key);
 			fetch(ajaxUrl, {
 				method: 'POST',
@@ -50,22 +76,15 @@
 				.then(function(r) { return r.json(); })
 				.then(function(data) {
 					validateKeyBtn.disabled = false;
-					resultEl.style.display = 'block';
-					var msg = (data.data && data.data.message) ? data.data.message : (data.success ? '' : 'Error');
-					resultEl.className = 'everyalt-validate-result notice ' + (data.success ? 'notice-success' : 'notice-error');
-					resultEl.textContent = '';
-					var p = document.createElement('p');
-					p.textContent = msg;
-					resultEl.appendChild(p);
+					var msg = (data.data && data.data.message) ? data.data.message : (data.success ? '' : t('error', 'Error'));
+					showResult(!!data.success, msg);
 				})
 				.catch(function() {
 					validateKeyBtn.disabled = false;
-					resultEl.style.display = 'block';
-					resultEl.className = 'everyalt-validate-result notice notice-error';
-					resultEl.innerHTML = '<p>Request failed.</p>';
+					showResult(false, t('requestFailed', 'Request failed'));
 				});
 		});
-	}
+	});
 
 	// Bulk: Select all / Select none
 	var selectAllBtn = document.getElementById('everyalt-bulk-select-all');
@@ -127,13 +146,13 @@
 						var success = data && data.success;
 						var msg = success ? (data.alt_text || '') : (data && data.message) ? data.message : '';
 						if (statusEl) {
-							statusEl.textContent = success ? '\u2713 ' + (data.alt_text || '') : '\u2717 ' + (data.message || 'Error');
+							statusEl.textContent = success ? '\u2713 ' + (data.alt_text || '') : '\u2717 ' + (data.message || t('error', 'Error'));
 							statusEl.className = 'everyalt-bulk-item-status ' + (success ? 'success' : 'error');
 						}
 						if (progressLog) {
 							var li = document.createElement('li');
 							li.className = success ? 'success' : 'error';
-							li.textContent = '#' + id + ': ' + (success ? (data.alt_text || '') : (data.message || 'Error'));
+							li.textContent = '#' + id + ': ' + (success ? (data.alt_text || '') : (data.message || t('error', 'Error')));
 							progressLog.appendChild(li);
 						}
 						if (success && itemEl) {
@@ -146,7 +165,7 @@
 					.catch(function(err) {
 						done++;
 						updateProgress();
-						var errMsg = err && err.message ? err.message : 'Request failed';
+						var errMsg = err && err.message ? err.message : t('requestFailed', 'Request failed');
 						if (statusEl) {
 							statusEl.textContent = '\u2717 ' + errMsg;
 							statusEl.className = 'everyalt-bulk-item-status error';
@@ -177,13 +196,12 @@
 			btn.disabled = true;
 			request('POST', '/everyalt-api/v1/save_alt', {
 				media_id: mediaId,
-				log_id: 0,
 				alt_text: altText
 			})
 				.then(function() {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Saved!';
+						statusEl.textContent = t('saved', 'Saved!');
 						statusEl.className = 'everyalt-review-status success';
 						setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 					}
@@ -191,7 +209,7 @@
 				.catch(function(err) {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Save failed');
+						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('saveFailed', 'Save failed'));
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -213,13 +231,13 @@
 					if (data && data.success && data.alt_text !== undefined) {
 						if (textarea) textarea.value = data.alt_text;
 						if (statusEl) {
-							statusEl.textContent = 'Regenerated!';
+							statusEl.textContent = t('regenerated', 'Regenerated!');
 							statusEl.className = 'everyalt-review-status success';
 							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 						}
 					} else {
 						if (statusEl) {
-							statusEl.textContent = 'Error: ' + (data && data.message ? data.message : 'Regenerate failed');
+							statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (data && data.message ? data.message : t('regenerateFailed', 'Regenerate failed'));
 							statusEl.className = 'everyalt-review-status error';
 						}
 					}
@@ -227,7 +245,7 @@
 				.catch(function(err) {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Request failed');
+						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -293,13 +311,13 @@
 						updateProgress();
 						var success = data && data.success;
 						if (statusEl) {
-							statusEl.textContent = success ? '✓ ' + (data.title || '') : '✗ ' + (data.message || 'Error');
+							statusEl.textContent = success ? '✓ ' + (data.title || '') : '✗ ' + (data.message || t('error', 'Error'));
 							statusEl.className = 'everyalt-bulk-item-status ' + (success ? 'success' : 'error');
 						}
 						if (titleProgressLog) {
 							var li = document.createElement('li');
 							li.className = success ? 'success' : 'error';
-							li.textContent = '#' + id + ': ' + (success ? (data.title || '') : (data.message || 'Error'));
+							li.textContent = '#' + id + ': ' + (success ? (data.title || '') : (data.message || t('error', 'Error')));
 							titleProgressLog.appendChild(li);
 						}
 						if (success && itemEl) {
@@ -312,7 +330,7 @@
 					.catch(function(err) {
 						done++;
 						updateProgress();
-						var errMsg = err && err.message ? err.message : 'Request failed';
+						var errMsg = err && err.message ? err.message : t('requestFailed', 'Request failed');
 						if (statusEl) {
 							statusEl.textContent = '✗ ' + errMsg;
 							statusEl.className = 'everyalt-bulk-item-status error';
@@ -348,7 +366,7 @@
 				.then(function() {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Saved!';
+						statusEl.textContent = t('saved', 'Saved!');
 						statusEl.className = 'everyalt-review-status success';
 						setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 					}
@@ -356,7 +374,7 @@
 				.catch(function(err) {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Save failed');
+						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('saveFailed', 'Save failed'));
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -378,13 +396,13 @@
 					if (data && data.success && data.title !== undefined) {
 						if (textarea) textarea.value = data.title;
 						if (statusEl) {
-							statusEl.textContent = 'Regenerated!';
+							statusEl.textContent = t('regenerated', 'Regenerated!');
 							statusEl.className = 'everyalt-review-status success';
 							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 						}
 					} else {
 						if (statusEl) {
-							statusEl.textContent = 'Error: ' + (data && data.message ? data.message : 'Regenerate failed');
+							statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (data && data.message ? data.message : t('regenerateFailed', 'Regenerate failed'));
 							statusEl.className = 'everyalt-review-status error';
 						}
 					}
@@ -392,7 +410,7 @@
 				.catch(function(err) {
 					btn.disabled = false;
 					if (statusEl) {
-						statusEl.textContent = 'Error: ' + (err && err.message ? err.message : 'Request failed');
+						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});

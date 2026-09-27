@@ -23,20 +23,14 @@
 class Every_Alt_Deactivator {
 
 	/**
-	 * Short Description. (use period)
-	 *
-	 * Long Description.
+	 * Clear one-time activation state. Settings are intentionally preserved.
 	 *
 	 * @since    1.0.0
 	 */
 	public static function deactivate() {
-		delete_option( 'every_alt_secret' );
-		delete_option( 'every_alt_openai_key' );
-		delete_option( 'every_alt_auto' );
-		delete_option( 'every_alt_fulltext' );
-		delete_option( 'every_alt_httpuser' );
-		delete_option( 'every_alt_httpassword' );
-		delete_option( 'every_alt_do_auto_default' );
+		// Settings and the API key are kept so the plugin works again on reactivation.
+		// Everything is removed on uninstall (see uninstall.php).
+		delete_option( 'every_alt_do_activation_redirect' );
 	}
 
 }
