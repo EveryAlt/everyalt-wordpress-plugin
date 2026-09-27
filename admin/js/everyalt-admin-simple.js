@@ -11,6 +11,21 @@
 	var i18n = (typeof everyaltAdmin !== 'undefined' && everyaltAdmin.i18n) || {};
 	function t(key, fallback) { return i18n[key] || fallback; }
 
+	// Announce a message to screen readers via WordPress's shared live regions (wp.a11y.speak), which
+	// are always present in the page, so the first message isn't lost like it can be with a live
+	// region that was just revealed.
+	function speak(message, assertive) {
+		if (message && window.wp && wp.a11y && wp.a11y.speak) wp.a11y.speak(message, assertive ? 'assertive' : 'polite');
+	}
+
+	// Mark a button as busy without the disabled attribute: a disabled button loses keyboard focus
+	// (it jumps to the top of the page), while aria-disabled keeps the user's place. Clicks are
+	// ignored while busy.
+	function isBusy(btn) { return btn.getAttribute('aria-disabled') === 'true'; }
+	function setBusy(btn, busy) {
+		if (busy) btn.setAttribute('aria-disabled', 'true'); else btn.removeAttribute('aria-disabled');
+	}
+
 	function request(method, path, body) {
 		var url = restUrl.replace(/\/$/, '') + path;
 		var opts = {
@@ -55,6 +70,7 @@
 			var p = document.createElement('p');
 			p.textContent = message;
 			resultEl.appendChild(p);
+			speak(message, !ok);
 		}
 		validateKeyBtn.addEventListener('click', function() {
 			var keyInput = block ? block.querySelector('input[type="password"]') : null;
@@ -62,7 +78,8 @@
 			if (!resultEl) return;
 			resultEl.style.display = 'none';
 			resultEl.className = 'everyalt-validate-result';
-			validateKeyBtn.disabled = true;
+			if (isBusy(validateKeyBtn)) return;
+			setBusy(validateKeyBtn, true);
 			var formData = new FormData();
 			formData.append('action', 'everyalt_validate_key');
 			formData.append('nonce', validateKeyNonce);
@@ -75,12 +92,12 @@
 			})
 				.then(function(r) { return r.json(); })
 				.then(function(data) {
-					validateKeyBtn.disabled = false;
+					setBusy(validateKeyBtn, false);
 					var msg = (data.data && data.data.message) ? data.data.message : (data.success ? '' : t('error', 'Error'));
 					showResult(!!data.success, msg);
 				})
 				.catch(function() {
-					validateKeyBtn.disabled = false;
+					setBusy(validateKeyBtn, false);
 					showResult(false, t('requestFailed', 'Request failed'));
 				});
 		});
@@ -182,8 +199,13 @@
 		(function step() {
 			request('POST', '/everyalt-api/v1/queue/process')
 				.then(function(data) {
-					(data.results || []).forEach(markItem);
+					var results = data.results || [];
+					results.forEach(markItem);
 					renderQueue(data.status);
+					// One summary per batch rather than one announcement per image.
+					if (results.length || (data.status && (data.status.paused || !data.status.total))) {
+						speak((results.length ? fmt(t('queueBatchDone', '%d finished.'), results.length) + ' ' : '') + queueText.textContent, !!(data.status && data.status.paused));
+					}
 					var st = data.status || {};
 					if (st.paused || !st.total) { queueRunning = false; return; }
 					if (data.locked || !st.due) {
@@ -200,22 +222,27 @@
 	}
 
 	function addToQueue(body, btn) {
-		if (btn) btn.disabled = true;
+		if (btn) {
+			if (isBusy(btn)) return Promise.resolve();
+			setBusy(btn, true);
+		}
 		return request('POST', '/everyalt-api/v1/queue', body)
 			.then(function(data) {
-				if (btn) btn.disabled = false;
+				if (btn) setBusy(btn, false);
 				if (queueLog) {
 					var li = document.createElement('li');
 					li.textContent = data.added ? fmt(t('queueAdded', 'Added %d images to the queue.'), data.added) : t('queueNothing', 'Those images were already queued.');
 					queueLog.insertBefore(li, queueLog.firstChild);
+					speak(li.textContent);
 				}
 				renderQueue(data.status);
 				runQueue();
 			})
 			.catch(function(err) {
-				if (btn) btn.disabled = false;
+				if (btn) setBusy(btn, false);
 				renderQueue({ total: 0 });
 				queueText.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
+				speak(queueText.textContent, true);
 			});
 	}
 
@@ -239,6 +266,7 @@
 			request('DELETE', '/everyalt-api/v1/queue').then(function(status) {
 				renderQueue(status);
 				queueText.textContent = t('queueCleared', 'Queue cleared.');
+				speak(queueText.textContent);
 			});
 		});
 	}
@@ -257,23 +285,26 @@
 			var textarea = item ? item.querySelector('.everyalt-review-alt-field') : null;
 			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
 			var altText = textarea ? textarea.value : '';
-			btn.disabled = true;
+			if (isBusy(btn)) return;
+			setBusy(btn, true);
 			request('POST', '/everyalt-api/v1/save_alt', {
 				media_id: mediaId,
 				alt_text: altText
 			})
 				.then(function() {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('saved', 'Saved!');
+						speak(statusEl.textContent);
 						statusEl.className = 'everyalt-review-status success';
 						setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 					}
 				})
 				.catch(function(err) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('saveFailed', 'Save failed'));
+						speak(statusEl.textContent, true);
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -287,31 +318,35 @@
 			var item = btn.closest('.everyalt-review-item');
 			var textarea = item ? item.querySelector('.everyalt-review-alt-field') : null;
 			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
-			btn.disabled = true;
+			if (isBusy(btn)) return;
+			setBusy(btn, true);
 			if (statusEl) statusEl.textContent = '';
 			var body = { media_id: mediaId };
 			if (btn.getAttribute('data-describe')) body.describe = true;
 			request('POST', '/everyalt-api/v1/bulk_generate_alt', body)
 				.then(function(data) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (data && data.success && data.alt_text !== undefined) {
 						if (textarea) textarea.value = data.alt_text;
 						if (statusEl) {
 							statusEl.textContent = data.decorative ? t('decorative', 'Marked as decorative') : t('regenerated', 'Regenerated!');
+							speak(statusEl.textContent);
 							statusEl.className = 'everyalt-review-status success';
 							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 						}
 					} else {
 						if (statusEl) {
 							statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (data && data.message ? data.message : t('regenerateFailed', 'Regenerate failed'));
+							speak(statusEl.textContent, true);
 							statusEl.className = 'everyalt-review-status error';
 						}
 					}
 				})
 				.catch(function(err) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
+						speak(statusEl.textContent, true);
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -342,23 +377,26 @@
 			var textarea = item ? item.querySelector('.everyalt-review-title-field') : null;
 			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
 			var title = textarea ? textarea.value : '';
-			btn.disabled = true;
+			if (isBusy(btn)) return;
+			setBusy(btn, true);
 			request('POST', '/everyalt-api/v1/save_title', {
 				media_id: mediaId,
 				title: title
 			})
 				.then(function() {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('saved', 'Saved!');
+						speak(statusEl.textContent);
 						statusEl.className = 'everyalt-review-status success';
 						setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 					}
 				})
 				.catch(function(err) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('saveFailed', 'Save failed'));
+						speak(statusEl.textContent, true);
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});
@@ -372,29 +410,33 @@
 			var item = btn.closest('.everyalt-review-title-item');
 			var textarea = item ? item.querySelector('.everyalt-review-title-field') : null;
 			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
-			btn.disabled = true;
+			if (isBusy(btn)) return;
+			setBusy(btn, true);
 			if (statusEl) statusEl.textContent = '';
 			request('POST', '/everyalt-api/v1/bulk_generate_title', { media_id: mediaId })
 				.then(function(data) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (data && data.success && data.title !== undefined) {
 						if (textarea) textarea.value = data.title;
 						if (statusEl) {
 							statusEl.textContent = t('regenerated', 'Regenerated!');
+							speak(statusEl.textContent);
 							statusEl.className = 'everyalt-review-status success';
 							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 						}
 					} else {
 						if (statusEl) {
 							statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (data && data.message ? data.message : t('regenerateFailed', 'Regenerate failed'));
+							speak(statusEl.textContent, true);
 							statusEl.className = 'everyalt-review-status error';
 						}
 					}
 				})
 				.catch(function(err) {
-					btn.disabled = false;
+					setBusy(btn, false);
 					if (statusEl) {
 						statusEl.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
+						speak(statusEl.textContent, true);
 						statusEl.className = 'everyalt-review-status error';
 					}
 				});

@@ -6,18 +6,17 @@
  * @subpackage EveryAlt/admin/partials
  */
 $base_url = admin_url( 'upload.php?page=everyalt' );
+// Screen-reader notice for links that open a new tab. WordPress core's string, so it is already translated.
+$everyalt_new_tab = '<span class="screen-reader-text"> ' . esc_html__( '(opens in a new tab)' ) . '</span>';
 ?>
 <div class="wrap">
 	<h1 class="wp-heading-inline"><?php esc_html_e( 'EveryAlt', 'everyalt' ); ?></h1>
 	<hr class="wp-header-end">
-	<h2 class="nav-tab-wrapper wp-clearfix" aria-label="<?php esc_attr_e( 'Secondary menu', 'everyalt' ); ?>">
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'settings', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'settings' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Settings', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'review', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'review' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'bulk_title', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'bulk_title' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Bulk Image Title Generator', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'review_title', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'review_title' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Review Image Titles', 'everyalt' ); ?></a>
-		<a href="<?php echo esc_url( add_query_arg( 'tab', 'logs', $base_url ) ); ?>" class="nav-tab <?php echo $active === 'logs' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Logs', 'everyalt' ); ?></a>
-	</h2>
+	<nav class="nav-tab-wrapper wp-clearfix" aria-label="<?php esc_attr_e( 'Secondary menu', 'everyalt' ); ?>">
+		<?php foreach ( Every_Alt_Admin::tabs() as $everyalt_tab => $everyalt_tab_label ) : ?>
+			<a href="<?php echo esc_url( add_query_arg( 'tab', $everyalt_tab, $base_url ) ); ?>" class="nav-tab<?php echo $active === $everyalt_tab ? ' nav-tab-active' : ''; ?>"<?php echo $active === $everyalt_tab ? ' aria-current="page"' : ''; ?>><?php echo esc_html( $everyalt_tab_label ); ?></a>
+		<?php endforeach; ?>
+	</nav>
 
 	<div class="notice notice-info everyalt-intro-notice" style="margin-top:1em;">
 		<p>
@@ -27,11 +26,14 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					/* translators: 1: opening link to everyalt.com, 2: closing link tag, 3: opening link to hdc.net, 4: closing link tag */
 					__( '%1$sEveryAlt%2$s is a free, open-source project created by %3$sHDC%4$s, a web dev firm for high-stakes projects and AI builds.', 'everyalt' ),
 					'<a href="' . esc_url( 'https://everyalt.com' ) . '" target="_blank" rel="noopener noreferrer">',
-					'</a>',
+					$everyalt_new_tab . '</a>',
 					'<a href="' . esc_url( 'https://hdc.net' ) . '" target="_blank" rel="noopener noreferrer">',
-					'</a>'
+					$everyalt_new_tab . '</a>'
 				),
-				array( 'a' => array( 'href' => true, 'target' => true, 'rel' => true ) )
+				array(
+					'a'    => array( 'href' => true, 'target' => true, 'rel' => true ),
+					'span' => array( 'class' => true ),
+				)
 			);
 			?>
 		</p>
@@ -47,13 +49,13 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="notice notice-error is-dismissible"><p><?php echo esc_html( sprintf( /* translators: %s: provider name, e.g. OpenAI */ __( 'The %s API key you entered could not be validated. Please check the key and try again. No settings were saved.', 'everyalt' ), $everyalt_bad_provider ? $everyalt_bad_provider['label'] : 'API' ) ); ?></p></div>
 <?php endif; ?>
 
-<div id="everyalt-queue-panel" class="notice notice-info everyalt-queue-panel hidden" aria-live="polite">
+<div id="everyalt-queue-panel" class="notice notice-info everyalt-queue-panel hidden">
 	<p>
 		<span class="spinner is-active everyalt-queue-spinner"></span>
 		<span id="everyalt-queue-text"></span>
 		<button type="button" id="everyalt-queue-clear" class="button-link"><?php esc_html_e( 'Clear queue', 'everyalt' ); ?></button>
 	</p>
-	<ul id="everyalt-queue-log" class="everyalt-bulk-progress-log"></ul>
+	<ul id="everyalt-queue-log" class="everyalt-bulk-progress-log" tabindex="0" aria-label="<?php esc_attr_e( 'Recent results', 'everyalt' ); ?>"></ul>
 </div>
 
 <?php if ( $active === 'settings' ) : ?>
@@ -66,8 +68,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				$everyalt_models         = Every_Alt_Providers::models();
 				$everyalt_providers      = Every_Alt_Providers::providers();
 				$everyalt_selected_model = Every_Alt_Providers::selected_model();
-				$everyalt_link           = function ( $url, $text ) {
-					return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $text ) . '</a>';
+				$everyalt_link           = function ( $url, $text ) use ( $everyalt_new_tab ) {
+					return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $text ) . $everyalt_new_tab . '</a>';
 				};
 				?>
 				<tr>
@@ -135,7 +137,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 									<input type="password" name="<?php echo esc_attr( $field ); ?>" id="<?php echo esc_attr( $field ); ?>" value="" class="regular-text" autocomplete="off" placeholder="<?php echo $has_saved ? esc_attr__( 'Leave blank to keep existing key', 'everyalt' ) : esc_attr__( 'Paste your API key', 'everyalt' ); ?>">
 									<button type="button" class="button everyalt-validate-key" data-provider="<?php echo esc_attr( $provider_slug ); ?>"><?php esc_html_e( 'Validate key', 'everyalt' ); ?></button>
 								</span>
-								<p class="everyalt-validate-result" aria-live="polite" style="display:none; margin-top:0.5em;"></p>
+								<p class="everyalt-validate-result" style="display:none; margin-top:0.5em;"></p>
 
 								<?php if ( $provider_slug === 'openai' ) : ?>
 									<ol class="everyalt-key-steps">
@@ -209,9 +211,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					<th scope="row"><label for="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>"><?php esc_html_e( 'Monthly spending limit', 'everyalt' ); ?></label></th>
 					<td>
 						<?php $everyalt_budget = Every_Alt_Usage::budget(); ?>
-						$ <input type="number" name="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" id="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" value="<?php echo $everyalt_budget > 0 ? esc_attr( number_format( $everyalt_budget, 2, '.', '' ) ) : ''; ?>" min="0" step="0.01" class="small-text" placeholder="<?php esc_attr_e( 'None', 'everyalt' ); ?>">
-						<?php esc_html_e( 'USD per month', 'everyalt' ); ?>
-						<p class="description">
+						<span aria-hidden="true">$</span> <input type="number" aria-describedby="everyalt-budget-unit everyalt-budget-desc" name="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" id="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" value=""<?php echo $everyalt_budget > 0 ? esc_attr( number_format( $everyalt_budget, 2, '.', '' ) ) : ''; ?>" min="0" step="0.01" class="small-text" placeholder="<?php esc_attr_e( 'None', 'everyalt' ); ?>">
+						<span id="everyalt-budget-unit"><?php esc_html_e( 'USD per month', 'everyalt' ); ?></span>
+						<p class="description" id="everyalt-budget-desc">
 							<?php
 							echo esc_html(
 								sprintf(
@@ -260,7 +262,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					<th scope="row"><label for="every_alt_vision_prompt"><?php esc_html_e( 'Alt text prompt', 'everyalt' ); ?></label></th>
 					<td>
 						<?php
-						$default_prompt  = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
+						$default_prompt  = Every_Alt_OpenAI::DEFAULT_PROMPT;
 						$current_prompt  = get_option( 'every_alt_vision_prompt', '' );
 						$editable_prompt = $current_prompt !== '' ? $current_prompt : $default_prompt;
 						?>
@@ -323,9 +325,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						$edit_link = get_edit_post_link( $aid, 'raw' );
 						if ( $edit_link ) :
 							?>
-							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?><span class="screen-reader-text"> “<?php echo esc_html( get_the_title( $aid ) ); ?>”</span></a>
 						<?php endif; ?>
-						<span class="everyalt-bulk-item-status" aria-live="polite"></span>
+						<span class="everyalt-bulk-item-status"></span>
 					</li>
 				<?php endforeach; ?>
 			</ul>
@@ -360,18 +362,20 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 							<span class="everyalt-decorative-badge"><?php esc_html_e( 'Decorative', 'everyalt' ); ?></span>
 						<?php endif; ?>
 						<?php if ( $edit_link ) : ?>
-							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?><span class="screen-reader-text"> “<?php echo esc_html( get_the_title( $aid ) ); ?>”</span></a>
 						<?php endif; ?>
-						<textarea class="everyalt-review-alt-field" rows="3" data-media-id="<?php echo $aid; ?>" placeholder="<?php echo $is_decorative ? esc_attr__( 'Empty on purpose: screen readers skip this image.', 'everyalt' ) : ''; ?>"><?php echo esc_textarea( $alt ); ?></textarea>
+						<label class="screen-reader-text" for="everyalt-alt-<?php echo $aid; ?>"><?php echo esc_html( sprintf( /* translators: %s: image title */ __( 'Alt text for “%s”', 'everyalt' ), get_the_title( $aid ) ) ); ?></label>
+						<textarea class="everyalt-review-alt-field" id="everyalt-alt-<?php echo $aid; ?>" rows="3" data-media-id="<?php echo $aid; ?>" placeholder="<?php echo $is_decorative ? esc_attr__( 'Empty on purpose: screen readers skip this image.', 'everyalt' ) : ''; ?>"><?php echo esc_textarea( $alt ); ?></textarea>
 						<div class="everyalt-review-actions">
-							<button type="button" class="button everyalt-review-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
+							<button type="button" class="button everyalt-review-save" data-media-id="<?php echo $aid; ?>" aria-describedby="everyalt-alt-<?php echo $aid; ?>-name"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
 							<?php if ( $is_decorative ) : ?>
-								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>" data-describe="1"><?php esc_html_e( 'Describe anyway', 'everyalt' ); ?></button>
+								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>" data-describe="1" aria-describedby="everyalt-alt-<?php echo $aid; ?>-name"><?php esc_html_e( 'Describe anyway', 'everyalt' ); ?></button>
 							<?php else : ?>
-								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>" aria-describedby="everyalt-alt-<?php echo $aid; ?>-name"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
 							<?php endif; ?>
 						</div>
-						<span class="everyalt-review-status" aria-live="polite"></span>
+						<span class="screen-reader-text" id="everyalt-alt-<?php echo $aid; ?>-name">“<?php echo esc_html( get_the_title( $aid ) ); ?>”</span>
+						<span class="everyalt-review-status"></span>
 					</li>
 				<?php endforeach; ?>
 			</ul>
@@ -417,9 +421,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						$edit_link = get_edit_post_link( $aid, 'raw' );
 						if ( $edit_link ) :
 							?>
-							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-bulk-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?><span class="screen-reader-text"> “<?php echo esc_html( get_the_title( $aid ) ); ?>”</span></a>
 						<?php endif; ?>
-						<span class="everyalt-bulk-item-status" aria-live="polite"></span>
+						<span class="everyalt-bulk-item-status"></span>
 					</li>
 				<?php endforeach; ?>
 			</ul>
@@ -450,14 +454,17 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					<li class="everyalt-review-title-item" data-media-id="<?php echo $aid; ?>">
 						<span class="everyalt-review-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
 						<?php if ( $edit_link ) : ?>
-							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
+							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?><span class="screen-reader-text"> “<?php echo esc_html( get_the_title( $aid ) ); ?>”</span></a>
 						<?php endif; ?>
-						<textarea class="everyalt-review-title-field" rows="2" data-media-id="<?php echo $aid; ?>"><?php echo esc_textarea( $title ); ?></textarea>
+						<?php $everyalt_file = wp_basename( (string) get_attached_file( $aid ) ); ?>
+						<label class="screen-reader-text" for="everyalt-title-<?php echo $aid; ?>"><?php echo esc_html( sprintf( /* translators: %s: image file name */ __( 'Title for image file “%s”', 'everyalt' ), $everyalt_file ) ); ?></label>
+						<textarea class="everyalt-review-title-field" id="everyalt-title-<?php echo $aid; ?>" rows="2" data-media-id="<?php echo $aid; ?>"><?php echo esc_textarea( $title ); ?></textarea>
 						<div class="everyalt-review-actions">
-							<button type="button" class="button everyalt-review-title-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
-							<button type="button" class="button everyalt-review-title-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+							<button type="button" class="button everyalt-review-title-save" data-media-id="<?php echo $aid; ?>" aria-describedby="everyalt-title-<?php echo $aid; ?>-name"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
+							<button type="button" class="button everyalt-review-title-regenerate" data-media-id="<?php echo $aid; ?>" aria-describedby="everyalt-title-<?php echo $aid; ?>-name"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
 						</div>
-						<span class="everyalt-review-status" aria-live="polite"></span>
+						<span class="screen-reader-text" id="everyalt-title-<?php echo $aid; ?>-name">“<?php echo esc_html( $everyalt_file ); ?>”</span>
+						<span class="everyalt-review-status"></span>
 					</li>
 				<?php endforeach; ?>
 			</ul>
@@ -490,7 +497,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		</p>
 		<?php if ( $everyalt_budget > 0 ) : ?>
 			<?php $everyalt_pct = min( 100, round( $everyalt_this_cost / $everyalt_budget * 100 ) ); ?>
-			<div class="everyalt-bulk-progress-bar everyalt-budget-bar<?php echo $everyalt_pct >= 100 ? ' is-full' : ''; ?>" role="progressbar" aria-valuenow="<?php echo (int) $everyalt_pct; ?>" aria-valuemin="0" aria-valuemax="100"><span style="width:<?php echo (int) $everyalt_pct; ?>%"></span></div>
+			<div class="everyalt-bulk-progress-bar everyalt-budget-bar<?php echo $everyalt_pct >= 100 ? ' is-full' : ''; ?>" role="progressbar" aria-label="<?php esc_attr_e( 'Monthly spending limit used', 'everyalt' ); ?>" aria-valuenow="<?php echo (int) $everyalt_pct; ?>" aria-valuemin="0" aria-valuemax="100" aria-valuetext="<?php echo esc_attr( sprintf( /* translators: 1: spent this month, 2: monthly limit */ __( '%1$s of %2$s', 'everyalt' ), Every_Alt_Usage::format_usd( $everyalt_this_cost ), Every_Alt_Usage::format_usd( $everyalt_budget ) ) ); ?>"><span style="width:<?php echo (int) $everyalt_pct; ?>%"></span></div>
 		<?php endif; ?>
 		<?php if ( $everyalt_usage ) : ?>
 			<table class="wp-list-table widefat fixed striped everyalt-usage-table">
@@ -588,7 +595,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 							<td><?php echo esc_html( isset( $entry['message'] ) ? $entry['message'] : '' ); ?></td>
 							<td><?php echo esc_html( isset( $entry['cost'] ) ? $entry['cost'] : '—' ); ?></td>
 							<td class="everyalt-log-detail">
-								<div class="everyalt-log-detail-inner"><?php echo esc_html( $details_display ); ?></div>
+								<div class="everyalt-log-detail-inner" tabindex="0" role="region" aria-label="<?php echo esc_attr( __( 'Details', 'everyalt' ) . ': ' . $entry['time'] . ', #' . (int) $entry['attachment_id'] ); ?>"><?php echo esc_html( $details_display ); ?></div>
 							</td>
 						</tr>
 					<?php endforeach; ?>

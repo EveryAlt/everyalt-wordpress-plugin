@@ -13,7 +13,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Every_Alt_OpenAI {
 
-	const DEFAULT_PROMPT = 'Describe this image in one short, clear sentence suitable for HTML alt text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
+	const DEFAULT_PROMPT = 'Describe this image in one short, clear sentence suitable for HTML alt text. If the image contains important text (such as a logo, sign, or heading), include that text. Do not start with "This image shows" or similar. Output only the alt text, nothing else.';
 
 	const DEFAULT_TITLE_PROMPT = 'Write a short, descriptive title for this image, suitable for a WordPress image title (about 3 to 6 words, Title Case). Do not use quotation marks, a trailing period, or phrases like "This image shows". Output only the title, nothing else.';
 

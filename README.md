@@ -44,7 +44,7 @@ We don’t charge. We don’t sit in the middle. You use **your** own key. Every
 - **In the block editor** — Generate or regenerate alt text right from the Image block.
 - **On the media screen** — Button next to the alt field for single images.
 - **Logs & export** — See what ran, what cost what, and export as CSV.
-- **Fixes older posts too** — Images already in posts pick up their new alt text automatically.
+- **Fixes older posts too (optional)** — Turn it on and images already in posts pick up their new alt text automatically.
 - **Decorative images** — Purely decorative images (dividers, spacers, patterns) get empty alt text so screen readers skip them, as WCAG recommends.
 - **Spending limits** — See estimated spend per month and per model, and set a monthly cap.
 - **Your language** — Alt text and titles are written in your site's language (Polylang and WPML supported).
@@ -150,9 +150,18 @@ The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages
 ## 📝 Changelog
 
 ### Unreleased
+- **Accessibility (WCAG 2.1 AA).** A full review of every screen, with all failures fixed:
+  - Review tabs: alt text and title fields now have labels; Save, Regenerate, and Edit identify which image they act on.
+  - Results (key validation, queue progress, saves, the Media screen button) are announced to screen readers via WordPress's `wp.a11y.speak`, once per batch rather than once per image.
+  - Keyboard focus stays on buttons while they work, instead of jumping to the top of the page.
+  - Success text and the "Key saved" badge now meet 4.5:1 contrast.
+  - Each tab has its own page title; the tab navigation is a `nav` landmark with the current tab marked.
+  - The Logs spending bar has an accessible name and value; scrollable log boxes are keyboard-reachable; links that open a new tab say so.
+- **Changed** **Existing posts** (filling missing alt text in posts) is now **off by default**, so it's only applied when a site owner turns it on.
+- **Improved** the default alt text prompt asks the model to include important visible text (logos, signs, headings).
 - **Fixed** estimated costs now include "thinking" tokens that some providers report outside the output count (Gemini's were missing, so Gemini costs were under-reported by about a third). Logs show them as **Thinking Tokens**, and the spending limit uses the corrected amounts.
 - **Improved** Gemini now uses Google's Interactions API, which sends images at low resolution (280 tokens instead of 1,120), cutting Gemini's cost per image by roughly half or more. Requests are sent with `store: false`, so Google doesn't keep them for later retrieval.
-- **New: alt text shows up in existing posts.** WordPress copies an image's alt text into a post when the image is inserted, so alt text generated later never reached older posts. EveryAlt now fills in empty alt text in post content from the Media Library as pages are displayed (WordPress 6.0+). Posts aren't modified, and alt text written in a post is never replaced. On by default; turn off under **Settings → Existing posts**.
+- **New: alt text shows up in existing posts.** WordPress copies an image's alt text into a post when the image is inserted, so alt text generated later never reached older posts. EveryAlt now fills in empty alt text in post content from the Media Library as pages are displayed (WordPress 6.0+). Posts aren't modified, and alt text written in a post is never replaced. Off by default; turn it on under **Settings → Existing posts**.
 - **New: background processing.** Bulk generation and new uploads now run in a background queue: close the tab and it keeps going, failures retry automatically (after 1, 5, and 30 minutes), and uploads finish immediately. The queue runs on WP-Cron and also whenever an EveryAlt page is open, so it works on sites where WP-Cron is blocked (e.g. behind HTTP auth). Bulk tabs gain a **Generate for all** button. Prefer the old behavior for uploads? Choose **Settings → New uploads → Generate during the upload**.
 - **New: decorative image detection.** When the AI judges an image clearly decorative, its alt text is left empty on purpose (per WCAG) and it's flagged on the Review Alt Text tab with a **Describe anyway** button. When in doubt, the AI describes the image. Turn off under **Settings → Decorative images**.
 - **New: spending controls.** The Logs tab shows estimated spend per month and per model. Set a **monthly spending limit** in Settings: when it's reached, generation pauses (queued images wait), admins see a notice, and it resumes next month or when the limit is raised.

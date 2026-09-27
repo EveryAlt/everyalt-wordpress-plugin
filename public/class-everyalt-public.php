@@ -22,7 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class Every_Alt_Public {
 
-	/** Option: fill missing alt text in post content on display (default on). */
+	/** Option: fill missing alt text in post content on display. Off by default: it changes what visitors see on existing posts, so a site owner turns it on deliberately. */
 	const FILL_OPTION = 'every_alt_fill_content_alt';
 
 	/**
@@ -31,7 +31,7 @@ class Every_Alt_Public {
 	 * @return bool
 	 */
 	public static function is_enabled() {
-		return (bool) get_option( self::FILL_OPTION, 1 );
+		return (bool) get_option( self::FILL_OPTION, 0 );
 	}
 
 	/**

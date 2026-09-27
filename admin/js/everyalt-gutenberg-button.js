@@ -79,6 +79,9 @@
 								onClick: generateAlt,
 								isBusy: isBusy,
 								disabled: isBusy,
+								// Keep the button focusable while busy (aria-disabled), so keyboard focus isn't lost.
+								accessibleWhenDisabled: true,
+								__experimentalIsFocusable: true,
 								style: { marginTop: '8px' }
 							}, t('button', 'Generate alt text with EveryAlt'))
 							: el('p', { className: 'everyalt-gutenberg-help', style: { margin: 0, fontSize: '12px', color: '#757575' } },
