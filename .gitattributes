@@ -4,3 +4,4 @@
 /.gitignore     export-ignore
 /build.sh       export-ignore
 /builds/        export-ignore
+/.github/       export-ignore

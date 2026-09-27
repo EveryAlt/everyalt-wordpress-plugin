@@ -138,10 +138,64 @@ class Every_Alt_Admin {
 				$cost_usd,
 				$detail,
 			);
-			fputcsv( $out, $row );
+			fputcsv( $out, array_map( array( $this, 'every_alt_csv_safe_cell' ), $row ) );
 		}
 		fclose( $out );
 		exit;
+	}
+
+	/**
+	 * Neutralize spreadsheet formulas: model output or API errors starting with =, +, -, @ (or a tab/CR)
+	 * would otherwise be evaluated when the CSV is opened in Excel or Sheets.
+	 *
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	private function every_alt_csv_safe_cell( $value ) {
+		if ( is_string( $value ) && $value !== '' && strpos( "=+-@\t\r", $value[0] ) !== false ) {
+			return "'" . $value;
+		}
+		return $value;
+	}
+
+	/**
+	 * One-time cleanup when the plugin version changes (updates do not re-run the activation hook).
+	 */
+	public function every_alt_maybe_upgrade() {
+		if ( get_option( 'every_alt_version' ) === $this->version ) {
+			return;
+		}
+		// Settings from earlier versions that are no longer used. The HTTP auth password was stored in plain text.
+		delete_option( 'every_alt_secret' );
+		delete_option( 'every_alt_fulltext' );
+		delete_option( 'every_alt_httpuser' );
+		delete_option( 'every_alt_httpassword' );
+		// Sites that already have a key have already chosen their auto-generate setting.
+		if ( get_option( Every_Alt_Encryption::OPTION_KEY, '' ) !== '' ) {
+			delete_option( 'every_alt_do_auto_default' );
+		}
+		update_option( 'every_alt_version', $this->version );
+	}
+
+	/**
+	 * Warn admins when a key is stored but can no longer be decrypted (e.g. AUTH_KEY in wp-config.php changed).
+	 */
+	public function every_alt_key_decrypt_notice() {
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( get_option( Every_Alt_Encryption::OPTION_KEY, '' ) === '' || $this->get_openai_key() !== '' ) {
+			return;
+		}
+		$url = admin_url( 'upload.php?page=everyalt&tab=settings' );
+		echo '<div class="notice notice-error"><p>' . wp_kses(
+			sprintf(
+				/* translators: %s: URL of the EveryAlt settings tab */
+				__( 'EveryAlt can no longer read your saved OpenAI API key, usually because the security keys in wp-config.php changed. Alt text generation is paused until you <a href="%s">re-enter your key</a>.', 'everyalt' ),
+				esc_url( $url )
+			),
+			array( 'a' => array( 'href' => true ) )
+		) . '</p></div>';
 	}
 
 	/**
@@ -199,9 +253,6 @@ class Every_Alt_Admin {
 	 */
 	private $version;
 
-
-	public $error;
-
 	/**
 	 * The hook suffix for the plugin's options page.
 	 *
@@ -222,7 +273,6 @@ class Every_Alt_Admin {
 
 		$this->plugin_name = $plugin_name;
 		$this->version = $version;
-		$this->error = false;
 
 	}
 
@@ -270,8 +320,34 @@ class Every_Alt_Admin {
 				'restNonce'        => wp_create_nonce( 'wp_rest' ),
 				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
 				'validateKeyNonce' => wp_create_nonce( 'everyalt_validate_key' ),
+				'i18n'             => array(
+					'error'            => __( 'Error', 'everyalt' ),
+					'errorPrefix'      => __( 'Error:', 'everyalt' ),
+					'requestFailed'    => __( 'Request failed', 'everyalt' ),
+					'saved'            => __( 'Saved!', 'everyalt' ),
+					'saveFailed'       => __( 'Save failed', 'everyalt' ),
+					'regenerated'      => __( 'Regenerated!', 'everyalt' ),
+					'regenerateFailed' => __( 'Regenerate failed', 'everyalt' ),
+				),
 			) );
 		}
+	}
+
+	/**
+	 * UI strings shared by the media-screen and block-editor "Generate alt text" buttons.
+	 *
+	 * @return array
+	 */
+	private function every_alt_button_i18n() {
+		return array(
+			'panelTitle'  => __( 'EveryAlt', 'everyalt' ),
+			'button'      => __( 'Generate alt text with EveryAlt', 'everyalt' ),
+			'selectImage' => __( 'Select or upload an image to generate alt text.', 'everyalt' ),
+			'generating'  => __( 'Generating…', 'everyalt' ),
+			'generated'   => __( 'Alt text generated.', 'everyalt' ),
+			'failed'      => __( 'Could not generate alt text.', 'everyalt' ),
+			'errorPrefix' => __( 'Error:', 'everyalt' ),
+		);
 	}
 
 	//redirect after activation
@@ -287,10 +363,13 @@ class Every_Alt_Admin {
 		wp_enqueue_script(
 			$this->plugin_name . '-gutenberg-image',
 			plugin_dir_url( __FILE__ ) . 'js/everyalt-gutenberg-button.js',
-			array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-hooks', 'wp-api-fetch' ),
+			array( 'wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-hooks', 'wp-api-fetch', 'wp-data', 'wp-notices' ),
 			$this->every_alt_asset_version( 'js/everyalt-gutenberg-button.js' ),
 			true
 		);
+		wp_localize_script( $this->plugin_name . '-gutenberg-image', 'everyaltBlock', array(
+			'i18n' => $this->every_alt_button_i18n(),
+		) );
 	}
 
 
@@ -328,42 +407,44 @@ class Every_Alt_Admin {
 			'restUrl'   => rest_url(),
 			'restNonce' => wp_create_nonce( 'wp_rest' ),
 			'mediaId'   => (int) $post->ID,
+			'i18n'      => $this->every_alt_button_i18n(),
 		) );
 		include_once 'partials/everyalt-custom-media-button.php';
 	}
 
 	/**
-	 * When attachment metadata is updated (after upload, so medium size exists), run auto alt if enabled and alt is empty.
+	 * Filter: wp_generate_attachment_metadata. Runs once per upload, after every sub-size has been
+	 * written to disk, so the medium size is available. Runs auto alt/title if enabled.
 	 *
-	 * @param int    $meta_id
-	 * @param int    $object_id
-	 * @param string $meta_key
-	 * @param mixed  $meta_value
+	 * The metadata has not been saved yet at this point, so it is passed through to the generator.
+	 *
+	 * @param array $metadata
+	 * @param int   $attachment_id
+	 * @return array Unchanged metadata.
 	 */
-	public function every_alt_maybe_auto_after_metadata( $meta_id, $object_id, $meta_key, $meta_value ) {
-		if ( $meta_key !== '_wp_attachment_metadata' || ! wp_attachment_is_image( $object_id ) ) {
-			return;
-		}
-		if ( ! is_array( $meta_value ) || empty( $meta_value['sizes'] ) ) {
-			return;
+	public function every_alt_maybe_auto_on_generate_metadata( $metadata, $attachment_id ) {
+		if ( ! is_array( $metadata ) || ! wp_attachment_is_image( $attachment_id ) ) {
+			return $metadata;
 		}
 		if ( ! $this->get_openai_key() ) {
-			return;
+			return $metadata;
 		}
 
 		// Auto alt text: only when alt is currently empty.
-		if ( get_option( $this->option_name . '_auto' ) && get_post_meta( $object_id, '_wp_attachment_image_alt', true ) === '' ) {
-			$this->every_alt_auto_add_image_alt_text( $object_id, false );
+		if ( get_option( $this->option_name . '_auto' ) && get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ) === '' ) {
+			$this->every_alt_auto_add_image_alt_text( $attachment_id, false, $metadata );
 		}
 
 		// Auto title: only when the current title still looks like the raw filename.
-		if ( get_option( $this->option_name . '_auto_title' ) && $this->every_alt_title_is_filename_like( $object_id ) ) {
-			$this->every_alt_auto_add_image_title( $object_id, false );
+		if ( get_option( $this->option_name . '_auto_title' ) && $this->every_alt_title_is_filename_like( $attachment_id ) ) {
+			$this->every_alt_auto_add_image_title( $attachment_id, false, $metadata );
 		}
+
+		return $metadata;
 	}
 
 	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
-	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null ) {
+	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null, $metadata = null ) {
 		$api_key = $this->get_openai_key();
 		$auto    = get_option( $this->option_name . '_auto' );
 		if ( $bulk ) {
@@ -377,13 +458,13 @@ class Every_Alt_Admin {
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: API key validation failed.', 'everyalt' ), '' );
 			return null;
 		}
-		if ( ! $this->every_alt_is_valid_image( $attachment_ID ) ) {
+		if ( ! $this->every_alt_is_valid_image( $attachment_ID, $metadata ) ) {
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
 			return null;
 		}
 
 		$openai        = new Every_Alt_OpenAI( $api_key );
-		$generated_alt = $openai->generate_alt( $attachment_ID );
+		$generated_alt = $openai->generate_alt( $attachment_ID, $metadata );
 
 		if ( ! empty( $generated_alt->error ) ) {
 			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
@@ -404,7 +485,6 @@ class Every_Alt_Admin {
 		}
 
 		update_post_meta( $attachment_ID, '_wp_attachment_image_alt', $generated_alt->alt );
-		$this->every_alt_media_logs( $generated_alt->alt, $attachment_ID );
 		$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
 		$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
 		$this->every_alt_add_generation_log( $attachment_ID, 'success', $generated_alt->alt, '', $usage, $cost );
@@ -416,7 +496,7 @@ class Every_Alt_Admin {
 	}
 
 	//auto title – direct OpenAI Vision API, image sent as base64 (medium size)
-	public function every_alt_auto_add_image_title( $attachment_ID, $bulk = null ) {
+	public function every_alt_auto_add_image_title( $attachment_ID, $bulk = null, $metadata = null ) {
 		$api_key = $this->get_openai_key();
 		$auto    = get_option( $this->option_name . '_auto_title' );
 		if ( $bulk ) {
@@ -430,13 +510,13 @@ class Every_Alt_Admin {
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: API key validation failed.', 'everyalt' ), '' );
 			return null;
 		}
-		if ( ! $this->every_alt_is_valid_image( $attachment_ID ) ) {
+		if ( ! $this->every_alt_is_valid_image( $attachment_ID, $metadata ) ) {
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
 			return null;
 		}
 
 		$openai          = new Every_Alt_OpenAI( $api_key );
-		$generated_title = $openai->generate_title( $attachment_ID );
+		$generated_title = $openai->generate_title( $attachment_ID, $metadata );
 
 		if ( ! empty( $generated_title->error ) ) {
 			$usage = isset( $generated_title->usage ) ? $generated_title->usage : '';
@@ -482,7 +562,18 @@ class Every_Alt_Admin {
 		if ( ! $post ) {
 			return false;
 		}
-		$title = trim( (string) $post->post_title );
+		return $this->every_alt_title_looks_like_filename( $post->post_title, get_attached_file( $attachment_id ) );
+	}
+
+	/**
+	 * Core of every_alt_title_is_filename_like(), working on raw values so it can run over query rows.
+	 *
+	 * @param string       $title Attachment post_title.
+	 * @param string|false $file  Attached file path (or the relative _wp_attached_file value); only its basename is used.
+	 * @return bool
+	 */
+	private function every_alt_title_looks_like_filename( $title, $file ) {
+		$title = trim( (string) $title );
 		if ( $title === '' ) {
 			return true;
 		}
@@ -501,7 +592,6 @@ class Every_Alt_Admin {
 		};
 
 		// Primary signal: title matches the uploaded filename (without extension), ignoring punctuation.
-		$file = get_attached_file( $attachment_id );
 		if ( $file ) {
 			$base = pathinfo( $file, PATHINFO_FILENAME );
 			if ( $normalize( $work ) === $normalize( $base ) ) {
@@ -583,70 +673,24 @@ class Every_Alt_Admin {
 		return $transitions >= 4;
 	}
 
-	private function every_alt_is_valid_image($media_id) {
-		$attachment = get_post($media_id);
-		if (wp_attachment_is_image($attachment)) {
-			$file_path = get_attached_file($media_id);
-			$file_size = filesize($file_path);
-			$max_size = 4 * 1024 * 1024; // 4MB in bytes
-			if ($file_size <= $max_size) {
-				return true;
-			}
+	/**
+	 * Whether an attachment can be sent for generation: an image whose file we would actually send
+	 * (medium size when available, see Every_Alt_OpenAI::get_image_path_for_vision()) is at most 4MB.
+	 *
+	 * @param int        $media_id
+	 * @param array|null $metadata Attachment metadata, when not yet saved (during upload).
+	 * @return bool
+	 */
+	private function every_alt_is_valid_image( $media_id, $metadata = null ) {
+		if ( ! wp_attachment_is_image( $media_id ) ) {
+			return false;
 		}
-		return false;
-	}
-
-	private function every_alt_media_logs($alt,$media_id){
-		$date = new DateTime();
-		global $wpdb;
-		$table_name = $wpdb->prefix . 'every_alt_logs';
-
-		$media = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM $table_name WHERE media_id = %d ORDER BY id ASC LIMIT 1",
-				$media_id
-			)
-		);
-		if ($media) {
-    		// Update alt text
-			$wpdb->update(
-				$table_name,
-				array('alt_text' => sanitize_text_field($alt)),
-				array('id' => $media->id)
-			);
-		}else{
-			$wpdb->insert(
-				$table_name,
-				array(
-					'media_id' => $media_id,
-					'alt_text' => sanitize_text_field($alt),
-					'created' => $date->format('Y-m-d H:i:s')
-				),
-				array(
-					'%s',
-					'%s',
-					'%s'
-				)
-			);
-		} 
-
-		
-	}
-
-
-	public function every_alt_on_media_delete($post_id) {
-		global $wpdb;
-		$table_name = $wpdb->prefix . 'every_alt_logs';
-		$media = $wpdb->get_row(
-			$wpdb->prepare(
-				"SELECT * FROM $table_name WHERE media_id = %d ORDER BY id ASC LIMIT 1",
-				$post_id
-			)
-		);
-		if ($media) {
-    		$wpdb->delete($table_name, array('id' => $media->id));
-		} 
-		return;
+		$path = Every_Alt_OpenAI::get_image_path_for_vision( $media_id, $metadata );
+		if ( ! $path ) {
+			return false;
+		}
+		$file_size = filesize( $path );
+		return $file_size !== false && $file_size <= 4 * 1024 * 1024;
 	}
 
 	private function every_alt_validate_token() {
@@ -654,142 +698,128 @@ class Every_Alt_Admin {
 		return ! empty( $api_key );
 	}
 
+	/** Images shown per page on the Bulk and Review tabs. */
+	const IMAGES_PER_PAGE = 60;
 
-	
-	private function every_alt_get_images(){
-		global $wpdb;
-		// Set the current page number
-		$page_number = isset( $_REQUEST['paged'] ) ? max( 1, absint( $_REQUEST['paged'] ) ) : 1;
+	/**
+	 * Current page number for the Bulk and Review tabs.
+	 *
+	 * @return int
+	 */
+	private function every_alt_current_page() {
+		return isset( $_GET['paged'] ) ? max( 1, absint( $_GET['paged'] ) ) : 1;
+	}
 
-		$per_page = 35;
-		$offset   = ( $page_number - 1 ) * $per_page;
-		$total_items = $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->prefix}every_alt_logs" );
-		$results = $wpdb->get_results(
-			$wpdb->prepare(
-				"SELECT * FROM {$wpdb->prefix}every_alt_logs ORDER BY id DESC LIMIT %d OFFSET %d",
-				$per_page,
-				$offset
-			)
+	/**
+	 * One page of image attachments with or without alt text, newest first.
+	 *
+	 * @param bool $with_alt True for images that have alt text, false for those missing it.
+	 * @return array { images: WP_Post[], total: int, pages: int, current: int }
+	 */
+	private function every_alt_get_images_by_alt( $with_alt ) {
+		if ( $with_alt ) {
+			$meta_query = array(
+				array(
+					'key'     => '_wp_attachment_image_alt',
+					'value'   => '',
+					'compare' => '!=',
+				),
+			);
+		} else {
+			$meta_query = array(
+				'relation' => 'OR',
+				array(
+					'key'     => '_wp_attachment_image_alt',
+					'compare' => 'NOT EXISTS',
+				),
+				array(
+					'key'   => '_wp_attachment_image_alt',
+					'value' => '',
+				),
+			);
+		}
+		$current = $this->every_alt_current_page();
+		$query   = new WP_Query( array(
+			'post_type'              => 'attachment',
+			'post_mime_type'         => 'image',
+			'post_status'            => 'any',
+			'posts_per_page'         => self::IMAGES_PER_PAGE,
+			'paged'                  => $current,
+			'meta_query'             => $meta_query, // phpcs:ignore WordPress.DB.SlowDBQuery
+			'update_post_term_cache' => false,
+		) );
+		return array(
+			'images'  => $query->posts,
+			'total'   => (int) $query->found_posts,
+			'pages'   => (int) $query->max_num_pages,
+			'current' => $current,
 		);
-		
-		if(!$results){
-			$response = [
-				'images' => [],
-				'pagination' => false,
-			];
-			return $response;
-		}
-		$pagination = paginate_links(array(
-			'base' => add_query_arg('paged', '%#%'),
-			'format' => '',
-			'current' => $page_number,
-			'total' => ceil($total_items / $per_page),
-		));
-
-		//get all the needed data
-		$images = [];
-		foreach ($results as $image) {
-			$array = [
-				'id'=>$image->id,
-				'media_id'=>$image->media_id,
-				'media_link'=>get_edit_post_link($image->media_id),
-				'alt_text'=> get_post_meta($image->media_id, '_wp_attachment_image_alt', true),
-				'image_url'=>wp_get_attachment_image_url($image->media_id)
-			];
-			$images[] = $array;
-
-			
-		}
-
-		$response = [
-			'images' => $images,
-			'pagination' => $pagination,
-		];
-
-		return $response;
-
-	}
-	
-
-	private function every_alt_get_images_without_alt(){
-		$images = get_posts( array(
-			'post_type' => 'attachment',
-			'post_mime_type' => 'image',
-			'posts_per_page' => -1,
-			'post_status' => 'any',
-		) );
-		$images_without_alt = array();
-		foreach ( $images as $image ) {
-			$alt = get_post_meta( $image->ID, '_wp_attachment_image_alt', true );
-			if ( empty( $alt ) ) {
-				$images_without_alt[] = $image;
-			}
-		}
-		return $images_without_alt;
 	}
 
 	/**
-	 * Get image attachments that already have alt text.
+	 * One page of image attachments whose title does (or does not) look like the raw upload filename.
 	 *
-	 * @return array Array of WP_Post objects.
+	 * The filename check can't be expressed in SQL, so this scans a lightweight (ID, title, file) row per
+	 * image in one query instead of loading every attachment post.
+	 *
+	 * @param bool $filename_like True for images needing a title, false for images with a custom title.
+	 * @return array { images: WP_Post[], total: int, pages: int, current: int }
 	 */
-	private function every_alt_get_images_with_alt() {
-		$images = get_posts( array(
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'posts_per_page' => -1,
-			'post_status'    => 'any',
-		) );
-		$with_alt = array();
-		foreach ( $images as $image ) {
-			$alt = get_post_meta( $image->ID, '_wp_attachment_image_alt', true );
-			if ( $alt !== '' ) {
-				$with_alt[] = $image;
+	private function every_alt_get_images_by_title( $filename_like ) {
+		global $wpdb;
+		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			"SELECT p.ID, p.post_title, pm.meta_value AS file
+			FROM {$wpdb->posts} p
+			LEFT JOIN {$wpdb->postmeta} pm ON pm.post_id = p.ID AND pm.meta_key = '_wp_attached_file'
+			WHERE p.post_type = 'attachment'
+				AND p.post_mime_type LIKE 'image/%'
+				AND p.post_status NOT IN ( 'trash', 'auto-draft' )
+			ORDER BY p.post_date DESC, p.ID DESC"
+		);
+		$ids = array();
+		foreach ( $rows as $row ) {
+			if ( $this->every_alt_title_looks_like_filename( $row->post_title, $row->file ) === $filename_like ) {
+				$ids[] = (int) $row->ID;
 			}
 		}
-		return $with_alt;
+
+		$total   = count( $ids );
+		$pages   = (int) ceil( $total / self::IMAGES_PER_PAGE );
+		$current = min( $this->every_alt_current_page(), max( 1, $pages ) );
+		$page_ids = array_slice( $ids, ( $current - 1 ) * self::IMAGES_PER_PAGE, self::IMAGES_PER_PAGE );
+		$images  = $page_ids ? get_posts( array(
+			'post_type'      => 'attachment',
+			'post_status'    => 'any',
+			'post__in'       => $page_ids,
+			'orderby'        => 'post__in',
+			'posts_per_page' => count( $page_ids ),
+		) ) : array();
+
+		return array(
+			'images'  => $images,
+			'total'   => $total,
+			'pages'   => $pages,
+			'current' => $current,
+		);
 	}
 
 	/**
-	 * Get image attachments whose title still looks like the raw filename (i.e. need a title).
+	 * Pagination links for a Bulk/Review tab result from every_alt_get_images_by_*().
 	 *
-	 * @return array Array of WP_Post objects.
+	 * @param array  $result
+	 * @param string $tab
+	 * @return string HTML, empty when there is only one page.
 	 */
-	private function every_alt_get_images_without_title() {
-		$images = get_posts( array(
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'posts_per_page' => -1,
-			'post_status'    => 'any',
-		) );
-		$without_title = array();
-		foreach ( $images as $image ) {
-			if ( $this->every_alt_title_is_filename_like( $image->ID ) ) {
-				$without_title[] = $image;
-			}
+	private function every_alt_pagination_links( $result, $tab ) {
+		if ( $result['pages'] < 2 ) {
+			return '';
 		}
-		return $without_title;
-	}
-
-	/**
-	 * Get image attachments that already have a custom (non-filename) title.
-	 *
-	 * @return array Array of WP_Post objects.
-	 */
-	private function every_alt_get_images_with_title() {
-		$images = get_posts( array(
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'posts_per_page' => -1,
-			'post_status'    => 'any',
+		return (string) paginate_links( array(
+			'base'    => add_query_arg( array( 'page' => $this->plugin_name, 'tab' => $tab, 'paged' => '%#%' ), admin_url( 'upload.php' ) ),
+			'format'  => '',
+			'current' => $result['current'],
+			'total'   => $result['pages'],
 		) );
-		$with_title = array();
-		foreach ( $images as $image ) {
-			if ( ! $this->every_alt_title_is_filename_like( $image->ID ) ) {
-				$with_title[] = $image;
-			}
-		}
-		return $with_title;
 	}
 
 	
@@ -844,20 +874,15 @@ class Every_Alt_Admin {
 
 		$has_openai_key = ! empty( $this->get_openai_key() );
 
-		if ( $active === 'bulk' ) {
-			$images_without_alt = $this->every_alt_get_images_without_alt();
+		$image_page       = null;
+		$pagination_links = '';
+		if ( $active === 'bulk' || $active === 'review' ) {
+			$image_page = $this->every_alt_get_images_by_alt( $active === 'review' );
+		} elseif ( $active === 'bulk_title' || $active === 'review_title' ) {
+			$image_page = $this->every_alt_get_images_by_title( $active === 'bulk_title' );
 		}
-
-		if ( $active === 'review' ) {
-			$images_with_alt = $this->every_alt_get_images_with_alt();
-		}
-
-		if ( $active === 'bulk_title' ) {
-			$images_without_title = $this->every_alt_get_images_without_title();
-		}
-
-		if ( $active === 'review_title' ) {
-			$images_with_title = $this->every_alt_get_images_with_title();
+		if ( $image_page ) {
+			$pagination_links = $this->every_alt_pagination_links( $image_page, $active );
 		}
 
 		if ( $active === 'logs' ) {
@@ -886,16 +911,6 @@ class Every_Alt_Admin {
 
 		register_setting(
 			$this->plugin_name,
-			$this->option_name . '_fulltext',
-			array(
-				'type'         => 'boolean',
-				'show_in_rest' => true,
-				'default'      => false,
-			)
-		);
-
-		register_setting(
-			$this->plugin_name,
 			$this->option_name . '_auto_title',
 			array(
 				'type'         => 'boolean',
@@ -905,25 +920,6 @@ class Every_Alt_Admin {
 		);
 
 
-		register_setting(
-			$this->plugin_name,
-			$this->option_name . '_httpuser',
-				array(
-				'type'         => 'string',
-				'show_in_rest' => true,
-				'default'      => '',
-			)
-		);
-		
-		register_setting(
-			$this->plugin_name,
-			$this->option_name . '_httpassword',
-				array(
-				'type'         => 'string',
-				'show_in_rest' => true,
-				'default'      => '',
-			)
-		);
 	}
 
 	/**
@@ -948,7 +944,6 @@ class Every_Alt_Admin {
 			}
 		}
 		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
-		update_option( $this->option_name . '_fulltext', ! empty( $_POST[ $this->option_name . '_fulltext' ] ) ? 1 : 0 );
 		update_option( $this->option_name . '_auto_title', ! empty( $_POST[ $this->option_name . '_auto_title' ] ) ? 1 : 0 );
 		if ( isset( $_POST['every_alt_vision_prompt'] ) ) {
 			update_option( 'every_alt_vision_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_vision_prompt'] ) ) );
@@ -960,43 +955,22 @@ class Every_Alt_Admin {
 			$val = sanitize_text_field( wp_unslash( $_POST['every_alt_max_completion_tokens'] ) );
 			update_option( 'every_alt_max_completion_tokens', $val === '' ? '' : max( 1, (int) $val ) );
 		}
-		if ( isset( $_POST[ $this->option_name . '_httpuser' ] ) ) {
-			update_option( $this->option_name . '_httpuser', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpuser' ] ) ) );
-		}
-		if ( isset( $_POST[ $this->option_name . '_httpassword' ] ) ) {
-			update_option( $this->option_name . '_httpassword', sanitize_text_field( wp_unslash( $_POST[ $this->option_name . '_httpassword' ] ) ) );
-		}
+		// The form showed the auto-generate default (checked) until now; from here on the saved value applies.
+		delete_option( 'every_alt_do_auto_default' );
 		wp_safe_redirect( add_query_arg( array( 'page' => 'everyalt', 'tab' => 'settings', 'updated' => '1' ), admin_url( 'upload.php' ) ) );
 		exit;
 	}
 
 	public function every_alt_custom_admin_endpoints() {
-        register_rest_route( 'everyalt-api/v1', '/get_tokens', array(
-			'methods' => WP_REST_Server::READABLE,
-            'callback' => [$this,'every_alt_get_tokens'],
-            'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			}
-        ));
-
-
 		register_rest_route( 'everyalt-api/v1', '/save_alt', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'every_alt_save_alt' ),
-			'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			},
+			'permission_callback' => array( $this, 'every_alt_rest_can_edit_media' ),
 			'args'                => array(
 				'media_id' => array(
 					'required'          => true,
 					'type'              => 'integer',
 					'minimum'           => 1,
-					'sanitize_callback' => 'absint',
-				),
-				'log_id'   => array(
-					'required'          => false,
-					'type'              => 'integer',
-					'minimum'           => 0,
 					'sanitize_callback' => 'absint',
 				),
 				'alt_text' => array(
@@ -1010,9 +984,7 @@ class Every_Alt_Admin {
 		register_rest_route( 'everyalt-api/v1', '/bulk_generate_alt', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'bulk_generate_alt' ),
-			'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			},
+			'permission_callback' => array( $this, 'every_alt_rest_can_edit_media' ),
 			'args'                => array(
 				'media_id' => array(
 					'required'          => true,
@@ -1026,9 +998,7 @@ class Every_Alt_Admin {
 		register_rest_route( 'everyalt-api/v1', '/save_title', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'every_alt_save_title' ),
-			'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			},
+			'permission_callback' => array( $this, 'every_alt_rest_can_edit_media' ),
 			'args'                => array(
 				'media_id' => array(
 					'required'          => true,
@@ -1047,9 +1017,7 @@ class Every_Alt_Admin {
 		register_rest_route( 'everyalt-api/v1', '/bulk_generate_title', array(
 			'methods'             => WP_REST_Server::CREATABLE,
 			'callback'            => array( $this, 'bulk_generate_title' ),
-			'permission_callback' => function () {
-				return current_user_can( 'manage_options' );
-			},
+			'permission_callback' => array( $this, 'every_alt_rest_can_edit_media' ),
 			'args'                => array(
 				'media_id' => array(
 					'required'          => true,
@@ -1065,6 +1033,20 @@ class Every_Alt_Admin {
 
 
     }
+
+	/**
+	 * REST permission: the user can edit this image attachment. Lets Editors and Authors use the
+	 * block-editor and media-screen buttons on media they are allowed to edit, not just admins.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return bool
+	 */
+	public function every_alt_rest_can_edit_media( $request ) {
+		$media_id = absint( $request->get_param( 'media_id' ) );
+		return $media_id > 0
+			&& wp_attachment_is_image( $media_id )
+			&& current_user_can( 'edit_post', $media_id );
+	}
 
 	public function bulk_generate_alt( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
@@ -1131,12 +1113,10 @@ class Every_Alt_Admin {
 
 	public function every_alt_save_alt( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
-		$log_id = absint( $request->get_param( 'log_id' ) );
 		$alt_text = sanitize_text_field( $request->get_param( 'alt_text' ) );
 		$update = update_post_meta( $media_id, '_wp_attachment_image_alt', $alt_text );
 		$response = [
 			'alt' => $alt_text,
-			'log_id' => $log_id,
 			'media_id' => $media_id,
 			'message' => __( 'Alt successfully updated.', 'everyalt' ),
 		];
@@ -1161,30 +1141,5 @@ class Every_Alt_Admin {
 	private function is_user_authorized() {
 		return ! empty( $this->get_openai_key() );
 	}
-
-
-	public function every_alt_get_tokens() {
-		$has_key = ! empty( $this->get_openai_key() );
-		if ( get_option( 'every_alt_do_auto_default', false ) ) {
-			delete_option( 'every_alt_do_auto_default' );
-			if ( $has_key ) {
-				update_option( $this->option_name . '_auto', 1 );
-			}
-		}
-		$response = array(
-			'error'        => false,
-			'tokens'       => null,
-			'used_tokens'  => null,
-			'auto'         => (int) get_option( $this->option_name . '_auto', 0 ),
-		);
-		return new WP_REST_Response( $response, 200 );
-	}
-
-	
-	
-
-	
-
-	
 
 }

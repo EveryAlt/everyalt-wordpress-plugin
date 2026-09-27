@@ -64,7 +64,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<tr>
 					<th scope="row"><?php esc_html_e( 'Auto-generate on upload', 'everyalt' ); ?></th>
 					<td>
-						<label><input type="checkbox" name="every_alt_auto" value="1" <?php checked( get_option( 'every_alt_auto', 0 ), 1 ); ?>><?php esc_html_e( 'Automatically generate alt text when images are uploaded', 'everyalt' ); ?></label>
+						<label><input type="checkbox" name="every_alt_auto" value="1" <?php checked( get_option( 'every_alt_do_auto_default' ) || get_option( 'every_alt_auto', 0 ) ); ?>><?php esc_html_e( 'Automatically generate alt text when images are uploaded', 'everyalt' ); ?></label>
 						<br>
 						<label><input type="checkbox" name="every_alt_auto_title" value="1" <?php checked( get_option( 'every_alt_auto_title', 0 ), 1 ); ?>><?php esc_html_e( 'Automatically generate image titles when images are uploaded', 'everyalt' ); ?></label>
 					</td>
@@ -127,17 +127,12 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 <?php endif; ?>
 
 <?php if ( $active === 'bulk' ) : ?>
-	<?php
-	$error = isset( $this->error ) ? $this->error : false;
-	?>
 	<div class="everyalt-bulk-wrap">
 		<h2><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h2>
 		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds all images in your media library that do not currently have alt text and lets you generate new alt text with EveryAlt quickly. To see existing images that already have alt text, go to the <a href="%s">Review Alt Text</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review', $base_url ) ) ) ); ?></p>
-		<?php if ( $error ) : ?>
-			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
-		<?php elseif ( ! $has_openai_key ) : ?>
+		<?php if ( ! $has_openai_key ) : ?>
 			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
-		<?php elseif ( empty( $images_without_alt ) ) : ?>
+		<?php elseif ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images without alt text found.', 'everyalt' ); ?></p>
 		<?php else : ?>
 			<p class="everyalt-bulk-actions">
@@ -150,8 +145,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-progress-fill"></span></div>
 				<ul id="everyalt-bulk-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
 			</div>
+			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-bulk-grid" id="everyalt-bulk-grid">
-				<?php foreach ( $images_without_alt as $image ) :
+				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					?>
 					<li class="everyalt-bulk-item" data-media-id="<?php echo $aid; ?>">
@@ -169,6 +165,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( $pagination_links ) : ?>
+				<div class="everyalt-pagination"><?php echo wp_kses_post( $pagination_links ); ?></div>
+			<?php endif; ?>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>
@@ -180,11 +179,12 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<?php if ( ! $has_openai_key ) : ?>
 			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
 		<?php endif; ?>
-		<?php if ( empty( $images_with_alt ) ) : ?>
+		<?php if ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images with alt text found.', 'everyalt' ); ?></p>
 		<?php else : ?>
+			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-review-grid" id="everyalt-review-grid">
-				<?php foreach ( $images_with_alt as $image ) :
+				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					$alt = get_post_meta( $aid, '_wp_attachment_image_alt', true );
 					$edit_link = get_edit_post_link( $aid, 'raw' );
@@ -203,22 +203,20 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( $pagination_links ) : ?>
+				<div class="everyalt-pagination"><?php echo wp_kses_post( $pagination_links ); ?></div>
+			<?php endif; ?>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>
 
 <?php if ( $active === 'bulk_title' ) : ?>
-	<?php
-	$error = isset( $this->error ) ? $this->error : false;
-	?>
 	<div class="everyalt-bulk-wrap">
 		<h2><?php esc_html_e( 'Bulk Image Title Generator', 'everyalt' ); ?></h2>
 		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds images whose title is still the raw upload filename (e.g. "IMG_1234") and lets you generate descriptive titles with EveryAlt quickly. To see images that already have a custom title, go to the <a href="%s">Review Image Titles</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review_title', $base_url ) ) ) ); ?></p>
-		<?php if ( $error ) : ?>
-			<div class="notice notice-error"><p><?php echo esc_html( $error ); ?></p></div>
-		<?php elseif ( ! $has_openai_key ) : ?>
+		<?php if ( ! $has_openai_key ) : ?>
 			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
-		<?php elseif ( empty( $images_without_title ) ) : ?>
+		<?php elseif ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images needing a title found.', 'everyalt' ); ?></p>
 		<?php else : ?>
 			<p class="everyalt-bulk-actions">
@@ -231,8 +229,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-title-progress-fill"></span></div>
 				<ul id="everyalt-bulk-title-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
 			</div>
+			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-bulk-grid" id="everyalt-bulk-title-grid">
-				<?php foreach ( $images_without_title as $image ) :
+				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					?>
 					<li class="everyalt-bulk-title-item" data-media-id="<?php echo $aid; ?>">
@@ -250,6 +249,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( $pagination_links ) : ?>
+				<div class="everyalt-pagination"><?php echo wp_kses_post( $pagination_links ); ?></div>
+			<?php endif; ?>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>
@@ -261,11 +263,12 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<?php if ( ! $has_openai_key ) : ?>
 			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
 		<?php endif; ?>
-		<?php if ( empty( $images_with_title ) ) : ?>
+		<?php if ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images with a custom title found.', 'everyalt' ); ?></p>
 		<?php else : ?>
+			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-review-grid" id="everyalt-review-title-grid">
-				<?php foreach ( $images_with_title as $image ) :
+				<?php foreach ( $image_page['images'] as $image ) :
 					$aid = (int) $image->ID;
 					$title = get_the_title( $aid );
 					$edit_link = get_edit_post_link( $aid, 'raw' );
@@ -284,6 +287,9 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</li>
 				<?php endforeach; ?>
 			</ul>
+			<?php if ( $pagination_links ) : ?>
+				<div class="everyalt-pagination"><?php echo wp_kses_post( $pagination_links ); ?></div>
+			<?php endif; ?>
 		<?php endif; ?>
 	</div>
 <?php endif; ?>

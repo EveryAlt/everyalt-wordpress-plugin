@@ -74,15 +74,16 @@ class Every_Alt_OpenAI {
 	/**
 	 * Get the file path for the best available image size (prefer medium to save tokens).
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Attachment metadata to use instead of the saved copy (during upload it is not saved yet).
 	 * @return string|null Full path or null.
 	 */
-	private function get_image_path_for_vision( $attachment_id ) {
+	public static function get_image_path_for_vision( $attachment_id, $metadata = null ) {
 		$file = get_attached_file( $attachment_id );
 		if ( ! $file || ! is_readable( $file ) ) {
 			return null;
 		}
-		$meta = wp_get_attachment_metadata( $attachment_id );
+		$meta = is_array( $metadata ) ? $metadata : wp_get_attachment_metadata( $attachment_id );
 		if ( empty( $meta['sizes'] ) ) {
 			return $file;
 		}
@@ -121,15 +122,16 @@ class Every_Alt_OpenAI {
 	/**
 	 * Generate alt text for an attachment using OpenAI Vision. Image is sent as base64.
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { alt: string|null, error: string|null, error_detail: string|null } Always returns object; check ->error for failure.
 	 */
-	public function generate_alt( $attachment_id ) {
+	public function generate_alt( $attachment_id, $metadata = null ) {
 		$saved_prompt = get_option( 'every_alt_vision_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
 		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
 
-		$result = $this->generate_text( $attachment_id, $prompt );
+		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
 		// Map shared 'text' field onto 'alt' for backward compatibility.
 		$result->alt = isset( $result->text ) ? $result->text : null;
@@ -140,15 +142,16 @@ class Every_Alt_OpenAI {
 	/**
 	 * Generate a short image title for an attachment using OpenAI Vision. Image is sent as base64.
 	 *
-	 * @param int $attachment_id
+	 * @param int        $attachment_id
+	 * @param array|null $metadata Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { title: string|null, error: string|null, error_detail: string|null, usage: string, cost: string } Always returns object; check ->error for failure.
 	 */
-	public function generate_title( $attachment_id ) {
+	public function generate_title( $attachment_id, $metadata = null ) {
 		$saved_prompt = get_option( 'every_alt_title_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_TITLE_PROMPT;
 		$prompt       = apply_filters( 'everyalt_title_prompt', $prompt );
 
-		$result = $this->generate_text( $attachment_id, $prompt );
+		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
 		$result->title = isset( $result->text ) ? $result->text : null;
 		unset( $result->text );
@@ -159,11 +162,12 @@ class Every_Alt_OpenAI {
 	 * Shared core: send the image plus a text prompt to OpenAI Vision and return the text response.
 	 *
 	 * @param int    $attachment_id
-	 * @param string $prompt        Instruction sent with the image.
+	 * @param string     $prompt        Instruction sent with the image.
+	 * @param array|null $metadata      Unsaved attachment metadata (during upload), see get_image_path_for_vision().
 	 * @return object { text: string|null, error: string|null, error_detail: string|null, usage: string, cost: string }
 	 */
-	private function generate_text( $attachment_id, $prompt ) {
-		$path = $this->get_image_path_for_vision( $attachment_id );
+	private function generate_text( $attachment_id, $prompt, $metadata = null ) {
+		$path = self::get_image_path_for_vision( $attachment_id, $metadata );
 		if ( ! $path ) {
 			return (object) array( 'text' => null, 'error' => 'Could not get image path for attachment.', 'error_detail' => '', 'usage' => '', 'cost' => '' );
 		}

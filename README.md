@@ -99,6 +99,19 @@ The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages
 
 ## 📝 Changelog
 
+### Unreleased
+- **Fixed** automatic updates: release ZIPs now bundle the update checker library (it was missing from ZIPs built with `build.sh`).
+- **Fixed** deactivating the plugin no longer deletes your API key and settings. Uninstalling now removes all EveryAlt data (settings, key, logs) instead of leaving it behind.
+- **Fixed** "Auto-generate on upload" now starts checked on fresh installs, as intended.
+- **Fixed** Editors and Authors can now use the block-editor and media-screen "Generate alt text" buttons on images they can edit, and failures now show a message instead of doing nothing.
+- **Fixed** auto-generation on upload now runs exactly once per image, after all image sizes exist (it could previously retry once per image size after a failure).
+- **Fixed** the 4MB limit now applies to the resized image actually sent to OpenAI, not the original upload, so large phone photos are no longer skipped.
+- **Improved** the Bulk and Review tabs are paginated and much faster on large media libraries.
+- **Improved** block-editor and media-screen button text is now translatable.
+- **Added** a warning when the saved API key can no longer be decrypted (e.g. after the security keys in `wp-config.php` change).
+- **Security** CSV log exports are protected against spreadsheet formula injection; the unused HTTP-auth username/password settings (the password was stored in plain text) have been removed and are deleted on update.
+- **Removed** the unused `every_alt_logs` database table (dropped on uninstall) and the legacy `/get_tokens` REST endpoint.
+
 ### 1.0.2
 - **New — AI image titles.** EveryAlt now writes descriptive WordPress image **titles**, not just alt text:
   - Optional **Automatically generate image titles when images are uploaded** toggle in Settings.
