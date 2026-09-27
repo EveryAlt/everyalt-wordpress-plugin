@@ -44,7 +44,7 @@ class Every_Alt_Admin {
 	 * @param string $message  Short message
 	 * @param string $detail   Optional longer detail (e.g. API error body)
 	 * @param string $usage    Optional token usage (e.g. "Input Tokens: 193, Output Tokens: 12, Total: 205")
-	 * @param string $cost     Optional estimated cost in cents (e.g. "0.0123¢" for gpt-5-nano)
+	 * @param string $cost     Optional estimated cost in cents (e.g. "0.0123¢")
 	 */
 	private function every_alt_add_generation_log( $attachment_id, $status, $message, $detail = '', $usage = '', $cost = '' ) {
 		$log   = get_option( self::GENERATION_LOG_OPTION, array() );
@@ -56,6 +56,7 @@ class Every_Alt_Admin {
 			'detail'        => $detail,
 			'usage'         => $usage,
 			'cost'          => $cost,
+			'model'         => $this->every_alt_selected_model_label(),
 		);
 		array_unshift( $log, $entry );
 		$log = array_slice( $log, 0, self::GENERATION_LOG_MAX );
@@ -112,6 +113,7 @@ class Every_Alt_Admin {
 			__( 'Time', 'everyalt' ),
 			__( 'Attachment ID', 'everyalt' ),
 			__( 'Status', 'everyalt' ),
+			__( 'Model', 'everyalt' ),
 			__( 'Message / Alt text', 'everyalt' ),
 			__( 'Cost (USD)', 'everyalt' ),
 			__( 'Details', 'everyalt' ),
@@ -134,6 +136,7 @@ class Every_Alt_Admin {
 				isset( $entry['time'] ) ? $entry['time'] : '',
 				isset( $entry['attachment_id'] ) ? $entry['attachment_id'] : '',
 				$status_label,
+				isset( $entry['model'] ) ? $entry['model'] : '',
 				isset( $entry['message'] ) ? $entry['message'] : '',
 				$cost_usd,
 				$detail,
@@ -171,9 +174,14 @@ class Every_Alt_Admin {
 		delete_option( 'every_alt_httpuser' );
 		delete_option( 'every_alt_httpassword' );
 		// Sites that already have a key have already chosen their auto-generate setting.
-		if ( get_option( Every_Alt_Encryption::OPTION_KEY, '' ) !== '' ) {
-			delete_option( 'every_alt_do_auto_default' );
+		foreach ( Every_Alt_Providers::providers() as $provider ) {
+			if ( get_option( $provider['key_option'], '' ) !== '' ) {
+				delete_option( 'every_alt_do_auto_default' );
+				break;
+			}
 		}
+		// gpt-5-nano is being retired; installs from before model selection move to GPT-5.4 nano.
+		add_option( Every_Alt_Providers::MODEL_OPTION, Every_Alt_Providers::DEFAULT_MODEL );
 		update_option( 'every_alt_version', $this->version );
 	}
 
@@ -184,14 +192,21 @@ class Every_Alt_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		if ( get_option( Every_Alt_Encryption::OPTION_KEY, '' ) === '' || $this->get_openai_key() !== '' ) {
+		$unreadable = array();
+		foreach ( Every_Alt_Providers::providers() as $slug => $provider ) {
+			if ( get_option( $provider['key_option'], '' ) !== '' && Every_Alt_Providers::get_key( $slug ) === '' ) {
+				$unreadable[] = $provider['label'];
+			}
+		}
+		if ( ! $unreadable ) {
 			return;
 		}
 		$url = admin_url( 'upload.php?page=everyalt&tab=settings' );
 		echo '<div class="notice notice-error"><p>' . wp_kses(
 			sprintf(
-				/* translators: %s: URL of the EveryAlt settings tab */
-				__( 'EveryAlt can no longer read your saved OpenAI API key, usually because the security keys in wp-config.php changed. Alt text generation is paused until you <a href="%s">re-enter your key</a>.', 'everyalt' ),
+				/* translators: 1: provider name(s), e.g. "OpenAI", 2: URL of the EveryAlt settings tab */
+				__( 'EveryAlt can no longer read your saved %1$s API key, usually because the security keys in wp-config.php changed. Generation with that provider is paused until you <a href="%2$s">re-enter the key</a>.', 'everyalt' ),
+				esc_html( implode( ', ', $unreadable ) ),
 				esc_url( $url )
 			),
 			array( 'a' => array( 'href' => true ) )
@@ -199,37 +214,49 @@ class Every_Alt_Admin {
 	}
 
 	/**
-	 * AJAX: Validate OpenAI API key (key from POST or stored key if empty).
+	 * AJAX: Validate a provider's API key (key from POST, or that provider's stored key if empty).
 	 */
 	public function ajax_validate_key() {
 		check_ajax_referer( 'everyalt_validate_key', 'nonce' );
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_send_json_error( array( 'message' => __( 'You do not have permission to do this.', 'everyalt' ) ) );
 		}
+		$provider = isset( $_POST['provider'] ) ? sanitize_key( wp_unslash( $_POST['provider'] ) ) : 'openai';
+		if ( ! Every_Alt_Providers::provider( $provider ) ) {
+			wp_send_json_error( array( 'message' => __( 'Unknown provider.', 'everyalt' ) ) );
+		}
 		$key = isset( $_POST['key'] ) ? sanitize_text_field( wp_unslash( $_POST['key'] ) ) : '';
 		if ( $key === '' ) {
-			$key = $this->get_openai_key();
+			$key = Every_Alt_Providers::get_key( $provider );
 		}
 		if ( $key === '' ) {
 			wp_send_json_error( array( 'message' => __( 'Enter an API key in the field above, or save a key first to validate the stored key.', 'everyalt' ) ) );
 		}
-		if ( Every_Alt_OpenAI::validate_api_key( $key ) ) {
+		if ( Every_Alt_Providers::validate_key( $provider, $key ) ) {
 			wp_send_json_success( array( 'message' => __( 'API key is valid.', 'everyalt' ) ) );
 		}
 		wp_send_json_error( array( 'message' => __( 'API key could not be validated. Check that the key is correct and has API access.', 'everyalt' ) ) );
 	}
 
 	/**
-	 * Get decrypted OpenAI API key (stored encrypted in DB).
+	 * Decrypted API key for the selected model's provider ('' if none is saved).
 	 *
 	 * @return string
 	 */
-	private function get_openai_key() {
-		$encrypted = get_option( Every_Alt_Encryption::OPTION_KEY, '' );
-		if ( $encrypted === '' ) {
-			return '';
-		}
-		return Every_Alt_Encryption::decrypt( $encrypted );
+	private function get_api_key() {
+		$model = Every_Alt_Providers::selected_model();
+		return Every_Alt_Providers::get_key( $model['provider'] );
+	}
+
+	/**
+	 * Display name of the selected model, e.g. "GPT-5.4 nano (OpenAI)".
+	 *
+	 * @return string
+	 */
+	private function every_alt_selected_model_label() {
+		$model    = Every_Alt_Providers::selected_model();
+		$provider = Every_Alt_Providers::provider( $model['provider'] );
+		return $model['label'] . ' (' . $provider['label'] . ')';
 	}
 
 	
@@ -426,7 +453,7 @@ class Every_Alt_Admin {
 		if ( ! is_array( $metadata ) || ! wp_attachment_is_image( $attachment_id ) ) {
 			return $metadata;
 		}
-		if ( ! $this->get_openai_key() ) {
+		if ( ! $this->get_api_key() ) {
 			return $metadata;
 		}
 
@@ -445,7 +472,7 @@ class Every_Alt_Admin {
 
 	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
 	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null, $metadata = null ) {
-		$api_key = $this->get_openai_key();
+		$api_key = $this->get_api_key();
 		$auto    = get_option( $this->option_name . '_auto' );
 		if ( $bulk ) {
 			$auto = 1;
@@ -497,7 +524,7 @@ class Every_Alt_Admin {
 
 	//auto title – direct OpenAI Vision API, image sent as base64 (medium size)
 	public function every_alt_auto_add_image_title( $attachment_ID, $bulk = null, $metadata = null ) {
-		$api_key = $this->get_openai_key();
+		$api_key = $this->get_api_key();
 		$auto    = get_option( $this->option_name . '_auto_title' );
 		if ( $bulk ) {
 			$auto = 1;
@@ -694,7 +721,7 @@ class Every_Alt_Admin {
 	}
 
 	private function every_alt_validate_token() {
-		$api_key = $this->get_openai_key();
+		$api_key = $this->get_api_key();
 		return ! empty( $api_key );
 	}
 
@@ -872,7 +899,7 @@ class Every_Alt_Admin {
 		$active = $tab;
 
 
-		$has_openai_key = ! empty( $this->get_openai_key() );
+		$has_api_key = ! empty( $this->get_api_key() );
 
 		$image_page       = null;
 		$pagination_links = '';
@@ -898,7 +925,7 @@ class Every_Alt_Admin {
 	
 
 	public function register_setting() {
-		// OpenAI key is stored encrypted via Every_Alt_Encryption::OPTION_KEY, not registered here.
+		// API keys are stored encrypted (see Every_Alt_Providers::save_key()), not registered here.
 		register_setting(
 			$this->plugin_name,
 			$this->option_name . '_auto',
@@ -932,15 +959,28 @@ class Every_Alt_Admin {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
-		$openai_key = isset( $_POST['every_alt_openai_key'] ) ? sanitize_text_field( wp_unslash( $_POST['every_alt_openai_key'] ) ) : '';
-		if ( $openai_key !== '' ) {
-			if ( ! Every_Alt_OpenAI::validate_api_key( $openai_key ) ) {
-				wp_safe_redirect( add_query_arg( array( 'page' => 'everyalt', 'tab' => 'settings', 'error' => 'everyalt_invalid_key' ), admin_url( 'upload.php' ) ) );
+		// Validate every newly entered key before saving anything, so a typo doesn't half-save the form.
+		$new_keys = array();
+		foreach ( Every_Alt_Providers::providers() as $slug => $provider ) {
+			$field = $provider['key_option'];
+			$key   = isset( $_POST[ $field ] ) ? sanitize_text_field( wp_unslash( $_POST[ $field ] ) ) : '';
+			if ( $key === '' ) {
+				continue;
+			}
+			if ( ! Every_Alt_Providers::validate_key( $slug, $key ) ) {
+				wp_safe_redirect( add_query_arg( array( 'page' => 'everyalt', 'tab' => 'settings', 'error' => 'everyalt_invalid_key', 'provider' => $slug ), admin_url( 'upload.php' ) ) );
 				exit;
 			}
-			$encrypted = Every_Alt_Encryption::encrypt( $openai_key );
-			if ( $encrypted !== '' ) {
-				update_option( Every_Alt_Encryption::OPTION_KEY, $encrypted );
+			$new_keys[ $slug ] = $key;
+		}
+		foreach ( $new_keys as $slug => $key ) {
+			Every_Alt_Providers::save_key( $slug, $key );
+		}
+		if ( isset( $_POST[ Every_Alt_Providers::MODEL_OPTION ] ) ) {
+			$model  = sanitize_text_field( wp_unslash( $_POST[ Every_Alt_Providers::MODEL_OPTION ] ) );
+			$models = Every_Alt_Providers::models();
+			if ( isset( $models[ $model ] ) ) {
+				update_option( Every_Alt_Providers::MODEL_OPTION, $model );
 			}
 		}
 		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
@@ -1139,7 +1179,7 @@ class Every_Alt_Admin {
 	}
 
 	private function is_user_authorized() {
-		return ! empty( $this->get_openai_key() );
+		return ! empty( $this->get_api_key() );
 	}
 
 }

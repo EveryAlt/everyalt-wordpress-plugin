@@ -41,7 +41,10 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="notice notice-success is-dismissible"><p><?php esc_html_e( 'Settings saved.', 'everyalt' ); ?></p></div>
 <?php endif; ?>
 <?php if ( isset( $_GET['error'] ) && $_GET['error'] === 'everyalt_invalid_key' ) : ?>
-	<div class="notice notice-error is-dismissible"><p><?php esc_html_e( 'The OpenAI API key you entered could not be validated. Please check the key and try again. It was not saved.', 'everyalt' ); ?></p></div>
+	<?php
+	$everyalt_bad_provider = Every_Alt_Providers::provider( isset( $_GET['provider'] ) ? sanitize_key( wp_unslash( $_GET['provider'] ) ) : 'openai' );
+	?>
+	<div class="notice notice-error is-dismissible"><p><?php echo esc_html( sprintf( /* translators: %s: provider name, e.g. OpenAI */ __( 'The %s API key you entered could not be validated. Please check the key and try again. No settings were saved.', 'everyalt' ), $everyalt_bad_provider ? $everyalt_bad_provider['label'] : 'API' ) ); ?></p></div>
 <?php endif; ?>
 
 <?php if ( $active === 'settings' ) : ?>
@@ -50,15 +53,121 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 		<form method="post" action="">
 			<?php wp_nonce_field( 'everyalt_save_settings', 'everyalt_settings_nonce' ); ?>
 			<table class="form-table" role="presentation">
+				<?php
+				$everyalt_models         = Every_Alt_Providers::models();
+				$everyalt_providers      = Every_Alt_Providers::providers();
+				$everyalt_selected_model = Every_Alt_Providers::selected_model();
+				$everyalt_link           = function ( $url, $text ) {
+					return '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $text ) . '</a>';
+				};
+				?>
 				<tr>
-					<th scope="row"><label for="every_alt_openai_key"><?php esc_html_e( 'OpenAI API Key', 'everyalt' ); ?></label></th>
+					<th scope="row"><?php esc_html_e( 'AI model', 'everyalt' ); ?></th>
 					<td>
-						<span class="everyalt-key-row">
-							<input type="password" name="every_alt_openai_key" id="every_alt_openai_key" value="" class="regular-text" autocomplete="off" placeholder="<?php esc_attr_e( 'Leave blank to keep existing key', 'everyalt' ); ?>">
-							<button type="button" id="everyalt-validate-key" class="button"><?php esc_html_e( 'Validate key', 'everyalt' ); ?></button>
-						</span>
-						<p id="everyalt-validate-result" class="everyalt-validate-result" aria-live="polite" style="display:none; margin-top:0.5em;"></p>
-						<p class="description"><?php esc_html_e( 'Alt text is generated via OpenAI (image is sent as base64, so it works on localhost and behind HTTP auth). Stored encrypted. You are charged by OpenAI for your usage; EveryAlt is free and never bills you.', 'everyalt' ); ?> <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Generate an API key', 'everyalt' ); ?></a></p>
+						<fieldset class="everyalt-model-list">
+							<legend class="screen-reader-text"><?php esc_html_e( 'AI model', 'everyalt' ); ?></legend>
+							<?php foreach ( $everyalt_models as $model_slug => $model ) :
+								$provider = $everyalt_providers[ $model['provider'] ];
+								?>
+								<label class="everyalt-model-option">
+									<input type="radio" name="<?php echo esc_attr( Every_Alt_Providers::MODEL_OPTION ); ?>" value="<?php echo esc_attr( $model_slug ); ?>" data-provider="<?php echo esc_attr( $model['provider'] ); ?>" <?php checked( $everyalt_selected_model['slug'], $model_slug ); ?>>
+									<strong><?php echo esc_html( $model['label'] ); ?></strong>
+									<span class="everyalt-model-provider"><?php echo esc_html( $provider['label'] ); ?></span>
+									<span class="everyalt-model-price">
+										<?php
+										echo esc_html(
+											sprintf(
+												/* translators: 1: input price in USD, 2: output price in USD */
+												__( '$%1$s input · $%2$s output per 1M tokens', 'everyalt' ),
+												Every_Alt_Providers::format_price( $model['input_price'] ),
+												Every_Alt_Providers::format_price( $model['output_price'] )
+											)
+										);
+										?>
+									</span>
+								</label>
+							<?php endforeach; ?>
+						</fieldset>
+						<p class="description">
+							<?php esc_html_e( 'All models read the image and write alt text and titles the same way. Prices are each provider’s published rates as of September 2026 and may change. You pay the provider directly; EveryAlt never bills you. The actual cost of each image is recorded on the Logs tab.', 'everyalt' ); ?>
+						</p>
+						<p class="description">
+							<?php
+							$everyalt_pricing_links = array();
+							foreach ( $everyalt_providers as $provider ) {
+								/* translators: %s: provider name, e.g. OpenAI */
+								$everyalt_pricing_links[] = $everyalt_link( $provider['pricing_url'], sprintf( __( '%s pricing', 'everyalt' ), $provider['label'] ) );
+							}
+							echo wp_kses_post( implode( ' · ', $everyalt_pricing_links ) );
+							?>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'API key', 'everyalt' ); ?></th>
+					<td>
+						<?php foreach ( $everyalt_providers as $provider_slug => $provider ) :
+							$field     = $provider['key_option'];
+							$has_saved = Every_Alt_Providers::get_key( $provider_slug ) !== '';
+							?>
+							<div class="everyalt-provider-key" data-provider="<?php echo esc_attr( $provider_slug ); ?>">
+								<h3 class="everyalt-provider-key-title">
+									<label for="<?php echo esc_attr( $field ); ?>">
+										<?php
+										/* translators: %s: provider name, e.g. OpenAI */
+										echo esc_html( sprintf( __( '%s API key', 'everyalt' ), $provider['label'] ) );
+										?>
+									</label>
+									<span class="everyalt-key-status <?php echo $has_saved ? 'is-saved' : 'is-missing'; ?>">
+										<?php echo $has_saved ? esc_html__( 'Key saved', 'everyalt' ) : esc_html__( 'No key saved', 'everyalt' ); ?>
+									</span>
+								</h3>
+								<span class="everyalt-key-row">
+									<input type="password" name="<?php echo esc_attr( $field ); ?>" id="<?php echo esc_attr( $field ); ?>" value="" class="regular-text" autocomplete="off" placeholder="<?php echo $has_saved ? esc_attr__( 'Leave blank to keep existing key', 'everyalt' ) : esc_attr__( 'Paste your API key', 'everyalt' ); ?>">
+									<button type="button" class="button everyalt-validate-key" data-provider="<?php echo esc_attr( $provider_slug ); ?>"><?php esc_html_e( 'Validate key', 'everyalt' ); ?></button>
+								</span>
+								<p class="everyalt-validate-result" aria-live="polite" style="display:none; margin-top:0.5em;"></p>
+
+								<?php if ( $provider_slug === 'openai' ) : ?>
+									<ol class="everyalt-key-steps">
+										<li><?php echo wp_kses_post( sprintf( /* translators: %s: link to OpenAI API keys page */ __( 'Sign in at %s.', 'everyalt' ), $everyalt_link( $provider['key_url'], 'platform.openai.com/api-keys' ) ) ); ?></li>
+										<li><?php esc_html_e( 'Click “Create new secret key”, give it a name (e.g. “EveryAlt”), and copy the key. It is only shown once.', 'everyalt' ); ?></li>
+										<li><?php esc_html_e( 'Add a payment method or prepaid credits in your OpenAI billing settings; generation fails until your account has credit.', 'everyalt' ); ?></li>
+									</ol>
+									<p class="description"><?php echo wp_kses_post( sprintf( /* translators: %s: link to OpenAI data usage policy */ __( 'OpenAI does not use API data to train its models by default. See %s.', 'everyalt' ), $everyalt_link( $provider['privacy_urls']['OpenAI API data usage'], __( 'OpenAI API data usage', 'everyalt' ) ) ) ); ?></p>
+								<?php elseif ( $provider_slug === 'gemini' ) : ?>
+									<ol class="everyalt-key-steps">
+										<li><?php echo wp_kses_post( sprintf( /* translators: %s: link to Google AI Studio API keys page */ __( 'Sign in to Google AI Studio at %s.', 'everyalt' ), $everyalt_link( $provider['key_url'], 'aistudio.google.com/apikey' ) ) ); ?></li>
+										<li><?php esc_html_e( 'Click “Create API key”, choose or create a Google Cloud project, and copy the key.', 'everyalt' ); ?></li>
+										<li><?php esc_html_e( 'Optional: set up billing on the project to move from the free tier to the paid tier.', 'everyalt' ); ?></li>
+									</ol>
+									<p class="description"><?php echo wp_kses_post( sprintf( /* translators: %s: link to Gemini API terms */ __( 'Gemini has a free tier, but Google may use free-tier prompts and images to improve its products. On the paid tier (billing enabled), your content is not used that way. See the %s.', 'everyalt' ), $everyalt_link( $provider['privacy_urls']['Gemini API terms'], __( 'Gemini API terms', 'everyalt' ) ) ) ); ?></p>
+								<?php elseif ( $provider_slug === 'deepinfra' ) : ?>
+									<ol class="everyalt-key-steps">
+										<li><?php echo wp_kses_post( sprintf( /* translators: %s: link to DeepInfra API keys page */ __( 'Sign in or create an account at %s.', 'everyalt' ), $everyalt_link( $provider['key_url'], 'deepinfra.com/dash/api_keys' ) ) ); ?></li>
+										<li><?php esc_html_e( 'Click “New API key”, name it (e.g. “EveryAlt”), and copy the key.', 'everyalt' ); ?></li>
+										<li><?php esc_html_e( 'Add a payment method or credits in your DeepInfra billing settings. One DeepInfra key works for both DeepSeek V4.1 Flash and GLM-5.3-Flash.', 'everyalt' ); ?></li>
+									</ol>
+									<div class="everyalt-privacy-note">
+										<p>
+											<strong><?php esc_html_e( 'Your images stay private.', 'everyalt' ); ?></strong>
+											<?php esc_html_e( 'DeepInfra runs these models on its own infrastructure in data centers in the US and Canada, with a zero data retention policy: your images and the generated text are processed in memory and not stored, the content of requests is not logged, and your data is never used to train models.', 'everyalt' ); ?>
+										</p>
+										<p>
+											<?php
+											$everyalt_privacy_links = array(
+												$everyalt_link( $provider['privacy_urls']['Data privacy'], __( 'DeepInfra data privacy', 'everyalt' ) ),
+												$everyalt_link( $provider['privacy_urls']['Privacy policy'], __( 'Privacy policy', 'everyalt' ) ),
+												$everyalt_link( $provider['privacy_urls']['Trust center'], __( 'Trust center (SOC 2, ISO 27001)', 'everyalt' ) ),
+											);
+											echo wp_kses_post( implode( ' · ', $everyalt_privacy_links ) );
+											?>
+										</p>
+									</div>
+								<?php endif; ?>
+							</div>
+						<?php endforeach; ?>
+						<p class="description"><?php esc_html_e( 'Keys are stored encrypted in your WordPress database. The image is sent to the provider as base64, so generation works on localhost and behind HTTP auth.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -73,25 +182,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					<th scope="row"><label for="every_alt_max_completion_tokens"><?php esc_html_e( 'Max completion tokens', 'everyalt' ); ?></label></th>
 					<td>
 						<input type="number" name="every_alt_max_completion_tokens" id="every_alt_max_completion_tokens" value="<?php echo esc_attr( get_option( 'every_alt_max_completion_tokens', '1024' ) ); ?>" min="1" max="128000" step="1" class="small-text">
-						<p class="description"><?php esc_html_e( 'Maximum tokens the model can use for the response (including reasoning for models like gpt-5-nano). Default 1024. Leave empty to use default.', 'everyalt' ); ?></p>
-						<?php
-						$model_for_display = apply_filters( Every_Alt_OpenAI::FILTER_MODEL, 'gpt-5-nano' );
-						$input_price       = (float) apply_filters( Every_Alt_OpenAI::FILTER_INPUT_PRICE_PER_MILLION, Every_Alt_OpenAI::DEFAULT_INPUT_PRICE_PER_MILLION );
-						$output_price      = (float) apply_filters( Every_Alt_OpenAI::FILTER_OUTPUT_PRICE_PER_MILLION, Every_Alt_OpenAI::DEFAULT_OUTPUT_PRICE_PER_MILLION );
-						$estimate_cents    = ( 200 * $input_price / 1000000 + 500 * $output_price / 1000000 ) * 100;
-						?>
-						<p class="description" style="margin-top:1em;">
-							<?php
-							echo wp_kses_post(
-								sprintf(
-									/* translators: 1: model name, 2: cost in cents e.g. 0.0210¢ */
-									__( 'Pricing: EveryAlt uses <strong>%1$s</strong>, currently the cheapest and most efficient model for this task. A reasonable estimate per image is about 200 input tokens and 500 output tokens, which works out to about <strong>%2$s</strong> per image.', 'everyalt' ),
-									esc_html( $model_for_display ),
-									number_format( $estimate_cents, 4 ) . '¢'
-								)
-							);
-							?>
-						</p>
+						<p class="description"><?php esc_html_e( 'Maximum tokens the model can use for its response, including any reasoning. Default 1024. Leave empty to use default.', 'everyalt' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -130,8 +221,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="everyalt-bulk-wrap">
 		<h2><?php esc_html_e( 'Bulk Alt Text Generator', 'everyalt' ); ?></h2>
 		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds all images in your media library that do not currently have alt text and lets you generate new alt text with EveryAlt quickly. To see existing images that already have alt text, go to the <a href="%s">Review Alt Text</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review', $base_url ) ) ) ); ?></p>
-		<?php if ( ! $has_openai_key ) : ?>
-			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_api_key ) : ?>
+			<p><?php esc_html_e( 'Please add an API key for the selected AI model in the Settings tab first.', 'everyalt' ); ?></p>
 		<?php elseif ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images without alt text found.', 'everyalt' ); ?></p>
 		<?php else : ?>
@@ -176,8 +267,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="everyalt-review-wrap">
 		<h2><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Images that already have alt text. Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
-		<?php if ( ! $has_openai_key ) : ?>
-			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_api_key ) : ?>
+			<p><?php esc_html_e( 'Please add an API key for the selected AI model in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
 		<?php endif; ?>
 		<?php if ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images with alt text found.', 'everyalt' ); ?></p>
@@ -214,8 +305,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="everyalt-bulk-wrap">
 		<h2><?php esc_html_e( 'Bulk Image Title Generator', 'everyalt' ); ?></h2>
 		<p class="description"><?php echo wp_kses_post( sprintf( __( 'This page finds images whose title is still the raw upload filename (e.g. "IMG_1234") and lets you generate descriptive titles with EveryAlt quickly. To see images that already have a custom title, go to the <a href="%s">Review Image Titles</a> tab.', 'everyalt' ), esc_url( add_query_arg( 'tab', 'review_title', $base_url ) ) ) ); ?></p>
-		<?php if ( ! $has_openai_key ) : ?>
-			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab first.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_api_key ) : ?>
+			<p><?php esc_html_e( 'Please add an API key for the selected AI model in the Settings tab first.', 'everyalt' ); ?></p>
 		<?php elseif ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images needing a title found.', 'everyalt' ); ?></p>
 		<?php else : ?>
@@ -260,8 +351,8 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="everyalt-review-wrap">
 		<h2><?php esc_html_e( 'Review Image Titles', 'everyalt' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Images that already have a custom title. Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
-		<?php if ( ! $has_openai_key ) : ?>
-			<p><?php esc_html_e( 'Please enter your OpenAI API key in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
+		<?php if ( ! $has_api_key ) : ?>
+			<p><?php esc_html_e( 'Please add an API key for the selected AI model in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
 		<?php endif; ?>
 		<?php if ( empty( $image_page['images'] ) ) : ?>
 			<p><?php esc_html_e( 'No images with a custom title found.', 'everyalt' ); ?></p>
@@ -310,6 +401,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 						<th style="width:140px"><?php esc_html_e( 'Time', 'everyalt' ); ?></th>
 						<th style="width:90px"><?php esc_html_e( 'Attachment', 'everyalt' ); ?></th>
 						<th style="width:80px"><?php esc_html_e( 'Status', 'everyalt' ); ?></th>
+						<th style="width:160px"><?php esc_html_e( 'Model', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Message / Alt text', 'everyalt' ); ?></th>
 						<th style="width:90px"><?php esc_html_e( 'Cost', 'everyalt' ); ?></th>
 						<th><?php esc_html_e( 'Details', 'everyalt' ); ?></th>
@@ -352,6 +444,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 								}
 								?>
 							</td>
+							<td><?php echo esc_html( isset( $entry['model'] ) ? $entry['model'] : '—' ); ?></td>
 							<td><?php echo esc_html( isset( $entry['message'] ) ? $entry['message'] : '' ); ?></td>
 							<td><?php echo esc_html( isset( $entry['cost'] ) ? $entry['cost'] : '—' ); ?></td>
 							<td class="everyalt-log-detail">

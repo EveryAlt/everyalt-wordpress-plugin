@@ -29,12 +29,35 @@
 		});
 	}
 
-	// Validate API key (Settings tab)
-	var validateKeyBtn = document.getElementById('everyalt-validate-key');
-	if (validateKeyBtn) {
-		var resultEl = document.getElementById('everyalt-validate-result');
+	// Settings: show only the API key block for the selected model's provider.
+	var modelRadios = document.querySelectorAll('.everyalt-model-list input[type="radio"]');
+	function showProviderKey() {
+		var checked = document.querySelector('.everyalt-model-list input[type="radio"]:checked');
+		var provider = checked ? checked.getAttribute('data-provider') : '';
+		document.querySelectorAll('.everyalt-provider-key').forEach(function(block) {
+			block.classList.toggle('hidden', block.getAttribute('data-provider') !== provider);
+		});
+	}
+	if (modelRadios.length) {
+		modelRadios.forEach(function(radio) { radio.addEventListener('change', showProviderKey); });
+		showProviderKey();
+	}
+
+	// Validate API key (Settings tab), one button per provider.
+	document.querySelectorAll('.everyalt-validate-key').forEach(function(validateKeyBtn) {
+		var block = validateKeyBtn.closest('.everyalt-provider-key');
+		var resultEl = block ? block.querySelector('.everyalt-validate-result') : null;
+		var provider = validateKeyBtn.getAttribute('data-provider');
+		function showResult(ok, message) {
+			resultEl.style.display = 'block';
+			resultEl.className = 'everyalt-validate-result notice ' + (ok ? 'notice-success' : 'notice-error');
+			resultEl.textContent = '';
+			var p = document.createElement('p');
+			p.textContent = message;
+			resultEl.appendChild(p);
+		}
 		validateKeyBtn.addEventListener('click', function() {
-			var keyInput = document.getElementById('every_alt_openai_key');
+			var keyInput = block ? block.querySelector('input[type="password"]') : null;
 			var key = keyInput ? keyInput.value.trim() : '';
 			if (!resultEl) return;
 			resultEl.style.display = 'none';
@@ -43,6 +66,7 @@
 			var formData = new FormData();
 			formData.append('action', 'everyalt_validate_key');
 			formData.append('nonce', validateKeyNonce);
+			formData.append('provider', provider);
 			formData.append('key', key);
 			fetch(ajaxUrl, {
 				method: 'POST',
@@ -52,25 +76,15 @@
 				.then(function(r) { return r.json(); })
 				.then(function(data) {
 					validateKeyBtn.disabled = false;
-					resultEl.style.display = 'block';
 					var msg = (data.data && data.data.message) ? data.data.message : (data.success ? '' : t('error', 'Error'));
-					resultEl.className = 'everyalt-validate-result notice ' + (data.success ? 'notice-success' : 'notice-error');
-					resultEl.textContent = '';
-					var p = document.createElement('p');
-					p.textContent = msg;
-					resultEl.appendChild(p);
+					showResult(!!data.success, msg);
 				})
 				.catch(function() {
 					validateKeyBtn.disabled = false;
-					resultEl.style.display = 'block';
-					resultEl.className = 'everyalt-validate-result notice notice-error';
-					resultEl.innerHTML = '';
-					var failP = document.createElement('p');
-					failP.textContent = t('requestFailed', 'Request failed');
-					resultEl.appendChild(failP);
+					showResult(false, t('requestFailed', 'Request failed'));
 				});
 		});
-	}
+	});
 
 	// Bulk: Select all / Select none
 	var selectAllBtn = document.getElementById('everyalt-bulk-select-all');

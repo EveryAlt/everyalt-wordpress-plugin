@@ -25,6 +25,9 @@ function every_alt_uninstall_site() {
 
 	$options = array(
 		'every_alt_openai_key',
+		'every_alt_gemini_key',
+		'every_alt_deepinfra_key',
+		'every_alt_model',
 		'every_alt_auto',
 		'every_alt_auto_title',
 		'every_alt_vision_prompt',

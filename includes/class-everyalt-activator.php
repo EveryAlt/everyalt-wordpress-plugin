@@ -30,7 +30,7 @@ class Every_Alt_Activator {
 	public static function activate() {
 		add_option( 'every_alt_do_activation_redirect', true );
 		// Auto-generate starts checked until the first API key is saved (see Every_Alt_Admin::every_alt_save_settings()).
-		if ( ! get_option( 'every_alt_openai_key' ) ) {
+		if ( ! get_option( 'every_alt_openai_key' ) && ! get_option( 'every_alt_gemini_key' ) && ! get_option( 'every_alt_deepinfra_key' ) ) {
 			add_option( 'every_alt_do_auto_default', true );
 		}
 	}

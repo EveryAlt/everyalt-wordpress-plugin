@@ -1,6 +1,6 @@
 <?php
 /**
- * Simple encryption for storing the OpenAI API key in the database.
+ * Simple encryption for storing provider API keys in the database.
  * Uses AES-256-CBC with a key derived from AUTH_KEY.
  *
  * @package EveryAlt
@@ -11,8 +11,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class Every_Alt_Encryption {
-
-	const OPTION_KEY = 'every_alt_openai_key';
 
 	/**
 	 * Get a 32-byte key derived from AUTH_KEY for AES-256.

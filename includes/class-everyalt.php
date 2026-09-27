@@ -116,6 +116,7 @@ class Every_Alt {
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-admin.php';
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-encryption.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-providers.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-openai.php';
 
 		$this->loader = new Every_Alt_Loader();
