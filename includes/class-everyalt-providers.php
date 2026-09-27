@@ -2,8 +2,10 @@
 /**
  * Registry of supported AI providers and models.
  *
- * Every provider exposes an OpenAI-compatible Chat Completions endpoint that accepts a base64 image
- * (data URL), so one request builder (Every_Alt_OpenAI) serves all of them.
+ * OpenAI and DeepInfra use OpenAI-style Chat Completions ('api' => 'chat'). Gemini uses its native
+ * Interactions API ('api' => 'interactions'), because only that API lets us request low image resolution
+ * (280 tokens per image instead of 1,120) and reports thinking tokens separately. Every_Alt_OpenAI builds
+ * both request styles; every provider receives the image inline as base64.
  *
  * Prices are the providers' published regular (non-promotional) rates in USD per 1M tokens, as of September 2026.
  * They are used for the cost estimates shown in Settings and Logs, and can be overridden with the
@@ -34,6 +36,7 @@ class Every_Alt_Providers {
 			'openai'    => array(
 				'label'        => 'OpenAI',
 				'key_option'   => 'every_alt_openai_key',
+				'api'          => 'chat',
 				'endpoint'     => 'https://api.openai.com/v1/chat/completions',
 				'models_url'   => 'https://api.openai.com/v1/models',
 				'token_param'  => 'max_completion_tokens',
@@ -47,9 +50,12 @@ class Every_Alt_Providers {
 			'gemini'    => array(
 				'label'        => 'Google Gemini',
 				'key_option'   => 'every_alt_gemini_key',
-				'endpoint'     => 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions',
+				'api'          => 'interactions',
+				'endpoint'     => 'https://generativelanguage.googleapis.com/v1beta/interactions',
+				// Key validation uses the OpenAI-compatible model list, which accepts a Bearer key.
 				'models_url'   => 'https://generativelanguage.googleapis.com/v1beta/openai/models',
-				'token_param'  => 'max_completion_tokens',
+				// 280 tokens per image instead of the default 1,120. Plenty of detail for alt text.
+				'image_resolution' => 'low',
 				'key_url'      => 'https://aistudio.google.com/apikey',
 				'pricing_url'  => 'https://ai.google.dev/gemini-api/docs/pricing',
 				'privacy_urls' => array(
@@ -59,6 +65,7 @@ class Every_Alt_Providers {
 			'deepinfra' => array(
 				'label'        => 'DeepInfra',
 				'key_option'   => 'every_alt_deepinfra_key',
+				'api'          => 'chat',
 				'endpoint'     => 'https://api.deepinfra.com/v1/openai/chat/completions',
 				'models_url'   => 'https://api.deepinfra.com/v1/openai/models',
 				'token_param'  => 'max_tokens',
@@ -99,8 +106,9 @@ class Every_Alt_Providers {
 				'label'        => 'Gemini 3.1 Flash-Lite',
 				'input_price'  => 0.25,
 				'output_price' => 1.50,
-				// Gemini 3 thinking cannot be turned off; "low" is the cheapest supported level.
-				'params'       => array( 'reasoning_effort' => 'low' ),
+				// Thinking can't be turned off on Gemini 3. Flash-Lite models default to the lowest level
+				// (minimal), which is cheaper than any level we could request, so none is set here.
+				'params'       => array(),
 			),
 			'deepinfra-deepseek-v4.1-flash' => array(
 				'provider'     => 'deepinfra',

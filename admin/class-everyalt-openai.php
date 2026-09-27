@@ -252,8 +252,7 @@ class Every_Alt_OpenAI {
 				'cost'         => '',
 			);
 		}
-		$mime     = $this->get_mime_type( $path );
-		$data_url = 'data:' . $mime . ';base64,' . $base64;
+		$mime = $this->get_mime_type( $path );
 
 		$saved_max   = get_option( 'every_alt_max_completion_tokens', '' );
 		$max_tokens  = $saved_max !== '' ? max( 1, (int) $saved_max ) : self::DEFAULT_MAX_COMPLETION_TOKENS;
@@ -261,30 +260,59 @@ class Every_Alt_OpenAI {
 		if ( ! empty( $this->provider_def['max_tokens_cap'] ) ) {
 			$max_tokens = min( (int) $max_tokens, (int) $this->provider_def['max_tokens_cap'] );
 		}
-		$image_url = array( 'url' => $data_url );
-		if ( ! empty( $this->provider_def['image_detail'] ) ) {
-			// OpenAI-only hint: low detail keeps image input tokens (and cost) small; plenty for alt text.
-			$image_url['detail'] = $this->provider_def['image_detail'];
-		}
-		$body = array(
-			'model'                            => $this->model,
-			$this->provider_def['token_param'] => (int) $max_tokens,
-			'messages'                         => array(
-				array(
-					'role'    => 'user',
-					'content' => array(
-						array(
-							'type' => 'text',
-							'text' => $prompt,
-						),
-						array(
-							'type'      => 'image_url',
-							'image_url' => $image_url,
+		$is_interactions = $this->is_interactions_api();
+		if ( $is_interactions ) {
+			// Gemini Interactions API. Unlike its OpenAI-compatible endpoint, it lets us set the image
+			// resolution: "low" is 280 tokens per image instead of the default 1,120.
+			$image = array(
+				'type'      => 'image',
+				'data'      => $base64,
+				'mime_type' => $mime,
+			);
+			if ( ! empty( $this->provider_def['image_resolution'] ) ) {
+				$image['resolution'] = $this->provider_def['image_resolution'];
+			}
+			$body    = array(
+				'model'             => $this->model,
+				'input'             => array(
+					array(
+						'type' => 'text',
+						'text' => $prompt,
+					),
+					$image,
+				),
+				'generation_config' => array( 'max_output_tokens' => (int) $max_tokens ),
+				// Don't keep the request and image on Google's side for later retrieval.
+				'store'             => false,
+			);
+			$headers = array( 'x-goog-api-key' => $this->api_key );
+		} else {
+			$image_url = array( 'url' => 'data:' . $mime . ';base64,' . $base64 );
+			if ( ! empty( $this->provider_def['image_detail'] ) ) {
+				// OpenAI-only hint: low detail keeps image input tokens (and cost) small; plenty for alt text.
+				$image_url['detail'] = $this->provider_def['image_detail'];
+			}
+			$body    = array(
+				'model'                            => $this->model,
+				$this->provider_def['token_param'] => (int) $max_tokens,
+				'messages'                         => array(
+					array(
+						'role'    => 'user',
+						'content' => array(
+							array(
+								'type' => 'text',
+								'text' => $prompt,
+							),
+							array(
+								'type'      => 'image_url',
+								'image_url' => $image_url,
+							),
 						),
 					),
 				),
-			),
-		);
+			);
+			$headers = array( 'Authorization' => 'Bearer ' . $this->api_key );
+		}
 
 		$body = array_merge( $body, $this->model_def['params'] );
 
@@ -292,10 +320,7 @@ class Every_Alt_OpenAI {
 			$this->provider_def['endpoint'],
 			array(
 				'timeout' => 60,
-				'headers' => array(
-					'Authorization' => 'Bearer ' . $this->api_key,
-					'Content-Type'  => 'application/json',
-				),
+				'headers' => $headers + array( 'Content-Type' => 'application/json' ),
 				'body'    => wp_json_encode( $body ),
 			)
 		);
@@ -312,7 +337,7 @@ class Every_Alt_OpenAI {
 		$code     = wp_remote_retrieve_response_code( $response );
 		$body_raw = wp_remote_retrieve_body( $response );
 		$json     = json_decode( $body_raw, true );
-		$usage_raw = isset( $json['usage'] ) ? $json['usage'] : null;
+		$usage_raw = $this->normalize_usage( is_array( $json ) && isset( $json['usage'] ) ? $json['usage'] : null );
 		$usage    = self::format_usage( $usage_raw );
 		$cost_usd = $this->cost_usd( $usage_raw );
 		$cost     = $cost_usd === null ? '' : number_format( $cost_usd * 100, 4 ) . '¢';
@@ -334,24 +359,36 @@ class Every_Alt_OpenAI {
 				'cost'         => $cost,
 			);
 		}
-		$content       = isset( $json['choices'][0]['message']['content'] ) ? $json['choices'][0]['message']['content'] : null;
-		$finish_reason = isset( $json['choices'][0]['finish_reason'] ) ? $json['choices'][0]['finish_reason'] : '';
-
-		// Content can be a string or an array of content parts (e.g. [ { "type": "text", "text": "..." } ] ).
-		$text = '';
-		if ( is_string( $content ) ) {
-			$text = $content;
-		} elseif ( is_array( $content ) ) {
-			foreach ( $content as $part ) {
-				if ( isset( $part['type'] ) && $part['type'] === 'text' && isset( $part['text'] ) ) {
-					$text .= $part['text'];
+		$text      = '';
+		$truncated = false;
+		if ( $is_interactions ) {
+			// { status, steps: [ { type: "model_output", content: [ { type: "text", text } ] } ] }
+			$status = isset( $json['status'] ) ? $json['status'] : '';
+			if ( $status === 'failed' || $status === 'cancelled' ) {
+				return (object) array(
+					'text'         => null,
+					'error'        => $this->provider_def['label'] . ' request ' . $status . '.',
+					'error_detail' => $body_raw,
+					'usage'        => $usage,
+					'cost'         => $cost,
+				);
+			}
+			$truncated = $status === 'incomplete';
+			foreach ( isset( $json['steps'] ) && is_array( $json['steps'] ) ? $json['steps'] : array() as $step ) {
+				if ( isset( $step['type'] ) && $step['type'] === 'model_output' && ! empty( $step['content'] ) ) {
+					$text .= self::text_from_parts( $step['content'] );
 				}
 			}
+		} else {
+			$content   = isset( $json['choices'][0]['message']['content'] ) ? $json['choices'][0]['message']['content'] : null;
+			$truncated = isset( $json['choices'][0]['finish_reason'] ) && $json['choices'][0]['finish_reason'] === 'length';
+			// Content can be a string or an array of content parts (e.g. [ { "type": "text", "text": "..." } ] ).
+			$text = is_string( $content ) ? $content : self::text_from_parts( $content );
 		}
 
 		$text = trim( $text );
 
-		if ( $finish_reason === 'length' ) {
+		if ( $truncated ) {
 			$length_message = __( 'Response was cut off (max tokens reached). Increase Max completion tokens in Settings to resolve this.', 'everyalt' );
 			return (object) array(
 				'text'         => null,
@@ -373,6 +410,79 @@ class Every_Alt_OpenAI {
 		}
 		$text = sanitize_text_field( $text );
 		return (object) array( 'text' => $text, 'error' => null, 'error_detail' => null, 'usage' => $usage, 'cost' => $cost );
+	}
+
+	/**
+	 * Whether this provider uses the Gemini Interactions API (else OpenAI-style Chat Completions).
+	 *
+	 * @return bool
+	 */
+	private function is_interactions_api() {
+		return isset( $this->provider_def['api'] ) && $this->provider_def['api'] === 'interactions';
+	}
+
+	/**
+	 * Map a provider's usage object onto Chat Completions field names (prompt_tokens, completion_tokens,
+	 * total_tokens, plus reasoning_tokens when reported separately).
+	 *
+	 * @param array|null $usage
+	 * @return array|null
+	 */
+	private function normalize_usage( $usage ) {
+		if ( ! is_array( $usage ) ) {
+			return null;
+		}
+		if ( ! $this->is_interactions_api() ) {
+			return $usage;
+		}
+		$out = array();
+		foreach ( array(
+			'prompt_tokens'     => 'total_input_tokens',
+			'completion_tokens' => 'total_output_tokens',
+			'reasoning_tokens'  => 'total_thought_tokens',
+			'total_tokens'      => 'total_tokens',
+		) as $to => $from ) {
+			if ( isset( $usage[ $from ] ) ) {
+				$out[ $to ] = (int) $usage[ $from ];
+			}
+		}
+		return $out;
+	}
+
+	/**
+	 * Output tokens the provider bills, including thinking/reasoning tokens.
+	 *
+	 * OpenAI counts reasoning inside completion_tokens; Gemini reports thinking separately and leaves it
+	 * out of the output count. Anything in the total beyond the prompt is billed as output either way,
+	 * so take the larger of the two views.
+	 *
+	 * @param array $usage Normalized usage.
+	 * @return int
+	 */
+	private static function billable_output_tokens( $usage ) {
+		$p = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : 0;
+		$c = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : 0;
+		$r = isset( $usage['reasoning_tokens'] ) ? (int) $usage['reasoning_tokens'] : 0;
+		if ( isset( $usage['total_tokens'] ) ) {
+			return max( $c, (int) $usage['total_tokens'] - $p );
+		}
+		return $c + $r;
+	}
+
+	/**
+	 * Concatenate the text parts of a content array ([ { type: "text", text } ]).
+	 *
+	 * @param mixed $parts
+	 * @return string
+	 */
+	private static function text_from_parts( $parts ) {
+		$text = '';
+		foreach ( is_array( $parts ) ? $parts : array() as $part ) {
+			if ( isset( $part['type'], $part['text'] ) && $part['type'] === 'text' ) {
+				$text .= $part['text'];
+			}
+		}
+		return $text;
 	}
 
 	/**
@@ -398,6 +508,10 @@ class Every_Alt_OpenAI {
 		if ( $c !== null ) {
 			$parts[] = 'Output Tokens: ' . $c;
 		}
+		$thinking = self::billable_output_tokens( $usage ) - (int) $c;
+		if ( $c !== null && $thinking > 0 ) {
+			$parts[] = 'Thinking Tokens: ' . $thinking;
+		}
 		if ( $t !== null ) {
 			$parts[] = 'Total: ' . $t;
 		}
@@ -415,7 +529,7 @@ class Every_Alt_OpenAI {
 			return null;
 		}
 		$p = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : 0;
-		$c = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : 0;
+		$c = self::billable_output_tokens( $usage );
 		if ( $p === 0 && $c === 0 ) {
 			return null;
 		}
