@@ -39,11 +39,15 @@ We don’t charge. We don’t sit in the middle. You use **your** own key. Every
 
 - **Auto-generate on upload** — New images get alt text as soon as they hit the Media Library.
 - **AI image titles** — Generate descriptive WordPress image titles too, not just alt text — automatically on upload, in bulk, or one at a time.
-- **Bulk generate** — Fix hundreds of images without alt text (or still named like their raw filename) in one go.
+- **Bulk generate in the background** — Queue hundreds or thousands of images and close the tab; EveryAlt keeps working, retries failures, and uploads never wait for the AI.
 - **Review & edit** — See everything that already has alt text or a title; edit or regenerate anytime.
 - **In the block editor** — Generate or regenerate alt text right from the Image block.
 - **On the media screen** — Button next to the alt field for single images.
 - **Logs & export** — See what ran, what cost what, and export as CSV.
+- **Fixes older posts too** — Images already in posts pick up their new alt text automatically.
+- **Decorative images** — Purely decorative images (dividers, spacers, patterns) get empty alt text so screen readers skip them, as WCAG recommends.
+- **Spending limits** — See estimated spend per month and per model, and set a monthly cap.
+- **Your language** — Alt text and titles are written in your site's language (Polylang and WPML supported).
 
 Works on localhost, behind HTTP auth, and with your existing workflow.
 
@@ -109,6 +113,10 @@ Gemini has a free tier, but Google may use free-tier content to improve its prod
 ### For developers
 
 - `everyalt_model` filters the model ID sent to the provider: `( string $model_id, string $model_slug )`. This replaces `everyalt_openai_model`.
+- `everyalt_output_locale` changes the language text is written in: `( string $locale, int $attachment_id )`.
+- `everyalt_vision_prompt` / `everyalt_title_prompt` now also receive the attachment ID, and the prompt they receive already includes the language instruction.
+- Queue REST routes (admins only): `GET/POST/DELETE everyalt-api/v1/queue` (status / add `{type, media_ids | all}` / clear) and `POST everyalt-api/v1/queue/process`.
+- `bulk_generate_alt` accepts `describe: true` to skip decorative detection, and returns `decorative`.
 - `everyalt_input_token_price_per_million` / `everyalt_output_token_price_per_million` override the prices used for cost estimates: `( float $price, string $model_slug )`.
 
 ---
@@ -142,6 +150,11 @@ The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages
 ## 📝 Changelog
 
 ### Unreleased
+- **New: alt text shows up in existing posts.** WordPress copies an image's alt text into a post when the image is inserted, so alt text generated later never reached older posts. EveryAlt now fills in empty alt text in post content from the Media Library as pages are displayed (WordPress 6.0+). Posts aren't modified, and alt text written in a post is never replaced. On by default; turn off under **Settings → Existing posts**.
+- **New: background processing.** Bulk generation and new uploads now run in a background queue: close the tab and it keeps going, failures retry automatically (after 1, 5, and 30 minutes), and uploads finish immediately. The queue runs on WP-Cron and also whenever an EveryAlt page is open, so it works on sites where WP-Cron is blocked (e.g. behind HTTP auth). Bulk tabs gain a **Generate for all** button. Prefer the old behavior for uploads? Choose **Settings → New uploads → Generate during the upload**.
+- **New: decorative image detection.** When the AI judges an image clearly decorative, its alt text is left empty on purpose (per WCAG) and it's flagged on the Review Alt Text tab with a **Describe anyway** button. When in doubt, the AI describes the image. Turn off under **Settings → Decorative images**.
+- **New: spending controls.** The Logs tab shows estimated spend per month and per model. Set a **monthly spending limit** in Settings: when it's reached, generation pauses (queued images wait), admins see a notice, and it resumes next month or when the limit is raised.
+- **New: alt text in your site's language.** Alt text and titles are now written in your site language, or each image's own language on multilingual sites using Polylang or WPML. Choose a specific language under **Settings → Language**.
 - **New: choose your AI model.** Pick from **GPT-5.4 nano** (OpenAI), **Gemini 3.1 Flash-Lite** (Google), or **DeepSeek V4.1 Flash** / **GLM-5.3-Flash** (DeepInfra) in Settings. Keys are stored per provider, so you can switch without re-entering them. Settings shows each model's published pricing, step-by-step key instructions, and privacy details, including DeepInfra's US/Canada hosting and zero data retention.
 - **Changed** OpenAI requests now use **GPT-5.4 nano**; `gpt-5-nano` is being retired. Existing installs switch automatically.
 - **Added** a Model column to the Logs tab and CSV export.

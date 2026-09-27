@@ -46,9 +46,9 @@
 			})
 			.then(function(data) {
 				btn.disabled = false;
-				var success = data && data.success && data.alt_text;
+				var success = data && data.success && (data.alt_text || data.decorative);
 				if (success) {
-					msg.textContent = t('generated', 'Alt text generated.');
+					msg.textContent = data.decorative ? t('decorative', 'Marked as decorative: alt text left empty on purpose.') : t('generated', 'Alt text generated.');
 					msg.className = 'everyalt-media-message notice notice-success';
 					var altField = document.getElementById('attachment_alt') || document.querySelector('textarea[name*="_wp_attachment_image_alt"]') || document.querySelector('input[name*="_wp_attachment_image_alt"]');
 					if (altField) {

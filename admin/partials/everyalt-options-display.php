@@ -47,6 +47,15 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 	<div class="notice notice-error is-dismissible"><p><?php echo esc_html( sprintf( /* translators: %s: provider name, e.g. OpenAI */ __( 'The %s API key you entered could not be validated. Please check the key and try again. No settings were saved.', 'everyalt' ), $everyalt_bad_provider ? $everyalt_bad_provider['label'] : 'API' ) ); ?></p></div>
 <?php endif; ?>
 
+<div id="everyalt-queue-panel" class="notice notice-info everyalt-queue-panel hidden" aria-live="polite">
+	<p>
+		<span class="spinner is-active everyalt-queue-spinner"></span>
+		<span id="everyalt-queue-text"></span>
+		<button type="button" id="everyalt-queue-clear" class="button-link"><?php esc_html_e( 'Clear queue', 'everyalt' ); ?></button>
+	</p>
+	<ul id="everyalt-queue-log" class="everyalt-bulk-progress-log"></ul>
+</div>
+
 <?php if ( $active === 'settings' ) : ?>
 	<div class="everyalt-settings-wrap">
 		<h2><?php esc_html_e( 'Settings', 'everyalt' ); ?></h2>
@@ -179,6 +188,68 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					</td>
 				</tr>
 				<tr>
+					<th scope="row"><?php esc_html_e( 'New uploads', 'everyalt' ); ?></th>
+					<td>
+						<fieldset>
+							<legend class="screen-reader-text"><?php esc_html_e( 'New uploads', 'everyalt' ); ?></legend>
+							<label><input type="radio" name="<?php echo esc_attr( Every_Alt_Admin::UPLOAD_MODE_OPTION ); ?>" value="background" <?php checked( Every_Alt_Admin::upload_mode(), 'background' ); ?>> <?php esc_html_e( 'Generate in the background (recommended): uploads finish right away', 'everyalt' ); ?></label><br>
+							<label><input type="radio" name="<?php echo esc_attr( Every_Alt_Admin::UPLOAD_MODE_OPTION ); ?>" value="immediate" <?php checked( Every_Alt_Admin::upload_mode(), 'immediate' ); ?>> <?php esc_html_e( 'Generate during the upload: alt text is ready when the upload finishes, but each upload waits for the AI', 'everyalt' ); ?></label>
+						</fieldset>
+						<p class="description"><?php esc_html_e( 'Background jobs usually finish within a minute. They run on WordPress’s scheduler (WP-Cron), and also whenever an EveryAlt page is open, so they still work on sites where WP-Cron is blocked, such as sites behind a password.', 'everyalt' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Decorative images', 'everyalt' ); ?></th>
+					<td>
+						<label><input type="checkbox" name="<?php echo esc_attr( Every_Alt_OpenAI::DECORATIVE_OPTION ); ?>" value="1" <?php checked( Every_Alt_OpenAI::decorative_detection_enabled() ); ?>><?php esc_html_e( 'Leave alt text empty for purely decorative images', 'everyalt' ); ?></label>
+						<p class="description"><?php esc_html_e( 'Accessibility guidelines (WCAG) say decorative images such as dividers, spacers, and background patterns should have empty alt text so screen readers skip them. When the AI judges an image clearly decorative, EveryAlt leaves its alt text empty and marks it on the Review Alt Text tab, where you can ask for a description instead. When in doubt, the AI describes the image.', 'everyalt' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>"><?php esc_html_e( 'Monthly spending limit', 'everyalt' ); ?></label></th>
+					<td>
+						<?php $everyalt_budget = Every_Alt_Usage::budget(); ?>
+						$ <input type="number" name="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" id="<?php echo esc_attr( Every_Alt_Usage::BUDGET_OPTION ); ?>" value="<?php echo $everyalt_budget > 0 ? esc_attr( number_format( $everyalt_budget, 2, '.', '' ) ) : ''; ?>" min="0" step="0.01" class="small-text" placeholder="<?php esc_attr_e( 'None', 'everyalt' ); ?>">
+						<?php esc_html_e( 'USD per month', 'everyalt' ); ?>
+						<p class="description">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: %s: estimated amount spent this month, e.g. $0.42 */
+									__( 'Estimated spend this month: %s. When the limit is reached, generation pauses until next month (queued images wait). Leave empty for no limit. Estimates use each provider’s published prices; your provider’s invoice is authoritative.', 'everyalt' ),
+									Every_Alt_Usage::format_usd( Every_Alt_Usage::month_total() )
+								)
+							);
+							?>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e( 'Existing posts', 'everyalt' ); ?></th>
+					<td>
+						<label><input type="checkbox" name="<?php echo esc_attr( Every_Alt_Public::FILL_OPTION ); ?>" value="1" <?php checked( Every_Alt_Public::is_enabled() ); ?>><?php esc_html_e( 'Show Media Library alt text on images already in posts that have none', 'everyalt' ); ?></label>
+						<p class="description"><?php esc_html_e( 'When an image is added to a post, WordPress copies its alt text into the post at that moment, so alt text generated later doesn’t appear in older posts. With this on, empty alt text in posts is filled in from the Media Library when the page is displayed. Your posts are not modified, and alt text written in a post is never replaced. Requires WordPress 6.0 or later.', 'everyalt' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="<?php echo esc_attr( Every_Alt_Language::OPTION ); ?>"><?php esc_html_e( 'Language', 'everyalt' ); ?></label></th>
+					<td>
+						<?php $everyalt_language = (string) get_option( Every_Alt_Language::OPTION, '' ); ?>
+						<select name="<?php echo esc_attr( Every_Alt_Language::OPTION ); ?>" id="<?php echo esc_attr( Every_Alt_Language::OPTION ); ?>">
+							<option value="" <?php selected( $everyalt_language, '' ); ?>>
+								<?php
+								/* translators: %s: site language name in English, e.g. German */
+								echo esc_html( sprintf( __( 'Automatic (site language: %s)', 'everyalt' ), Every_Alt_Language::name( get_locale() ) ) );
+								?>
+							</option>
+							<?php foreach ( Every_Alt_Language::languages() as $everyalt_code => $everyalt_name ) : ?>
+								<option value="<?php echo esc_attr( $everyalt_code ); ?>" <?php selected( $everyalt_language, $everyalt_code ); ?>><?php echo esc_html( $everyalt_name ); ?></option>
+							<?php endforeach; ?>
+						</select>
+						<p class="description"><?php esc_html_e( 'Language for generated alt text and titles. Automatic uses your site language, or each image’s own language on multilingual sites using Polylang or WPML.', 'everyalt' ); ?></p>
+					</td>
+				</tr>
+				<tr>
 					<th scope="row"><label for="every_alt_max_completion_tokens"><?php esc_html_e( 'Max completion tokens', 'everyalt' ); ?></label></th>
 					<td>
 						<input type="number" name="every_alt_max_completion_tokens" id="every_alt_max_completion_tokens" value="<?php echo esc_attr( get_option( 'every_alt_max_completion_tokens', '1024' ) ); ?>" min="1" max="128000" step="1" class="small-text">
@@ -229,13 +300,14 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 			<p class="everyalt-bulk-actions">
 				<button type="button" id="everyalt-bulk-select-all" class="button"><?php esc_html_e( 'Select all', 'everyalt' ); ?></button>
 				<button type="button" id="everyalt-bulk-select-none" class="button"><?php esc_html_e( 'Select none', 'everyalt' ); ?></button>
-				<button type="button" id="everyalt-bulk-run" class="button button-primary"><?php esc_html_e( 'Generate alt text for selected', 'everyalt' ); ?></button>
+				<button type="button" class="button button-primary everyalt-queue-selected" data-type="alt" data-checkboxes=".everyalt-bulk-checkbox"><?php esc_html_e( 'Generate alt text for selected', 'everyalt' ); ?></button>
+				<button type="button" class="button everyalt-queue-all" data-type="alt">
+					<?php
+					/* translators: %s: number of images */
+					echo esc_html( sprintf( _n( 'Generate for all %s image', 'Generate for all %s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) );
+					?>
+				</button>
 			</p>
-			<div id="everyalt-bulk-progress" class="everyalt-bulk-progress hidden">
-				<p class="everyalt-bulk-progress-status"><strong><?php esc_html_e( 'Processing…', 'everyalt' ); ?></strong> <span id="everyalt-bulk-progress-text">0 / 0</span></p>
-				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-progress-fill"></span></div>
-				<ul id="everyalt-bulk-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
-			</div>
 			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-bulk-grid" id="everyalt-bulk-grid">
 				<?php foreach ( $image_page['images'] as $image ) :
@@ -266,7 +338,7 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 <?php if ( $active === 'review' ) : ?>
 	<div class="everyalt-review-wrap">
 		<h2><?php esc_html_e( 'Review Alt Text', 'everyalt' ); ?></h2>
-		<p class="description"><?php esc_html_e( 'Images that already have alt text. Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
+		<p class="description"><?php esc_html_e( 'Images that already have alt text, plus images marked decorative (alt text left empty on purpose). Edit and save, or regenerate with EveryAlt.', 'everyalt' ); ?></p>
 		<?php if ( ! $has_api_key ) : ?>
 			<p><?php esc_html_e( 'Please add an API key for the selected AI model in the Settings tab to use Regenerate.', 'everyalt' ); ?></p>
 		<?php endif; ?>
@@ -279,16 +351,24 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 					$aid = (int) $image->ID;
 					$alt = get_post_meta( $aid, '_wp_attachment_image_alt', true );
 					$edit_link = get_edit_post_link( $aid, 'raw' );
+					$is_decorative = $alt === '' && get_post_meta( $aid, Every_Alt_Admin::DECORATIVE_META, true );
 					?>
-					<li class="everyalt-review-item" data-media-id="<?php echo $aid; ?>">
+					<li class="everyalt-review-item<?php echo $is_decorative ? ' is-decorative' : ''; ?>" data-media-id="<?php echo $aid; ?>">
 						<span class="everyalt-review-thumb"><?php echo wp_get_attachment_image( $aid, 'thumbnail' ); ?></span>
+						<?php if ( $is_decorative ) : ?>
+							<span class="everyalt-decorative-badge"><?php esc_html_e( 'Decorative', 'everyalt' ); ?></span>
+						<?php endif; ?>
 						<?php if ( $edit_link ) : ?>
 							<a href="<?php echo esc_url( $edit_link ); ?>" class="everyalt-review-edit-link"><?php esc_html_e( 'Edit', 'everyalt' ); ?></a>
 						<?php endif; ?>
-						<textarea class="everyalt-review-alt-field" rows="3" data-media-id="<?php echo $aid; ?>"><?php echo esc_textarea( $alt ); ?></textarea>
+						<textarea class="everyalt-review-alt-field" rows="3" data-media-id="<?php echo $aid; ?>" placeholder="<?php echo $is_decorative ? esc_attr__( 'Empty on purpose: screen readers skip this image.', 'everyalt' ) : ''; ?>"><?php echo esc_textarea( $alt ); ?></textarea>
 						<div class="everyalt-review-actions">
 							<button type="button" class="button everyalt-review-save" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Save', 'everyalt' ); ?></button>
-							<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+							<?php if ( $is_decorative ) : ?>
+								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>" data-describe="1"><?php esc_html_e( 'Describe anyway', 'everyalt' ); ?></button>
+							<?php else : ?>
+								<button type="button" class="button everyalt-review-regenerate" data-media-id="<?php echo $aid; ?>"><?php esc_html_e( 'Regenerate', 'everyalt' ); ?></button>
+							<?php endif; ?>
 						</div>
 						<span class="everyalt-review-status" aria-live="polite"></span>
 					</li>
@@ -313,13 +393,14 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 			<p class="everyalt-bulk-actions">
 				<button type="button" id="everyalt-bulk-title-select-all" class="button"><?php esc_html_e( 'Select all', 'everyalt' ); ?></button>
 				<button type="button" id="everyalt-bulk-title-select-none" class="button"><?php esc_html_e( 'Select none', 'everyalt' ); ?></button>
-				<button type="button" id="everyalt-bulk-title-run" class="button button-primary"><?php esc_html_e( 'Generate titles for selected', 'everyalt' ); ?></button>
+				<button type="button" class="button button-primary everyalt-queue-selected" data-type="title" data-checkboxes=".everyalt-bulk-title-checkbox"><?php esc_html_e( 'Generate titles for selected', 'everyalt' ); ?></button>
+				<button type="button" class="button everyalt-queue-all" data-type="title">
+					<?php
+					/* translators: %s: number of images */
+					echo esc_html( sprintf( _n( 'Generate for all %s image', 'Generate for all %s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) );
+					?>
+				</button>
 			</p>
-			<div id="everyalt-bulk-title-progress" class="everyalt-bulk-progress hidden">
-				<p class="everyalt-bulk-progress-status"><strong><?php esc_html_e( 'Processing…', 'everyalt' ); ?></strong> <span id="everyalt-bulk-title-progress-text">0 / 0</span></p>
-				<div class="everyalt-bulk-progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><span id="everyalt-bulk-title-progress-fill"></span></div>
-				<ul id="everyalt-bulk-title-progress-log" class="everyalt-bulk-progress-log" aria-live="polite"></ul>
-			</div>
 			<p class="everyalt-page-count"><?php echo esc_html( sprintf( /* translators: %s: number of images */ _n( '%s image', '%s images', $image_page['total'], 'everyalt' ), number_format_i18n( $image_page['total'] ) ) ); ?></p>
 			<ul class="everyalt-bulk-grid" id="everyalt-bulk-title-grid">
 				<?php foreach ( $image_page['images'] as $image ) :
@@ -387,6 +468,63 @@ $base_url = admin_url( 'upload.php?page=everyalt' );
 
 <?php if ( $active === 'logs' ) : ?>
 	<div class="everyalt-logs-wrap">
+		<h2><?php esc_html_e( 'Spending', 'everyalt' ); ?></h2>
+		<?php
+		$everyalt_usage     = Every_Alt_Usage::all();
+		$everyalt_models    = Every_Alt_Providers::models();
+		$everyalt_budget    = Every_Alt_Usage::budget();
+		$everyalt_this_cost = Every_Alt_Usage::month_total();
+		?>
+		<p>
+			<?php
+			if ( $everyalt_budget > 0 ) {
+				/* translators: 1: spent this month, 2: monthly limit */
+				echo esc_html( sprintf( __( 'This month: %1$s of your %2$s limit.', 'everyalt' ), Every_Alt_Usage::format_usd( $everyalt_this_cost ), Every_Alt_Usage::format_usd( $everyalt_budget ) ) );
+			} else {
+				/* translators: %s: spent this month */
+				echo esc_html( sprintf( __( 'This month: %s (no limit set).', 'everyalt' ), Every_Alt_Usage::format_usd( $everyalt_this_cost ) ) );
+			}
+			?>
+		</p>
+		<?php if ( $everyalt_budget > 0 ) : ?>
+			<?php $everyalt_pct = min( 100, round( $everyalt_this_cost / $everyalt_budget * 100 ) ); ?>
+			<div class="everyalt-bulk-progress-bar everyalt-budget-bar<?php echo $everyalt_pct >= 100 ? ' is-full' : ''; ?>" role="progressbar" aria-valuenow="<?php echo (int) $everyalt_pct; ?>" aria-valuemin="0" aria-valuemax="100"><span style="width:<?php echo (int) $everyalt_pct; ?>%"></span></div>
+		<?php endif; ?>
+		<?php if ( $everyalt_usage ) : ?>
+			<table class="wp-list-table widefat fixed striped everyalt-usage-table">
+				<thead>
+					<tr>
+						<th><?php esc_html_e( 'Month', 'everyalt' ); ?></th>
+						<th><?php esc_html_e( 'Requests', 'everyalt' ); ?></th>
+						<th><?php esc_html_e( 'Estimated cost', 'everyalt' ); ?></th>
+						<th><?php esc_html_e( 'By model', 'everyalt' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $everyalt_usage as $everyalt_month => $everyalt_row ) : ?>
+						<tr>
+							<td><?php echo esc_html( date_i18n( 'F Y', strtotime( $everyalt_month . '-01' ) ) ); ?></td>
+							<td><?php echo esc_html( number_format_i18n( $everyalt_row['requests'] ) ); ?></td>
+							<td><?php echo esc_html( Every_Alt_Usage::format_usd( $everyalt_row['cost'] ) ); ?></td>
+							<td>
+								<?php
+								$everyalt_parts = array();
+								foreach ( $everyalt_row['models'] as $everyalt_slug => $everyalt_m ) {
+									$everyalt_label   = isset( $everyalt_models[ $everyalt_slug ] ) ? $everyalt_models[ $everyalt_slug ]['label'] : $everyalt_slug;
+									$everyalt_parts[] = sprintf( '%s: %s (%s)', $everyalt_label, Every_Alt_Usage::format_usd( $everyalt_m['cost'] ), number_format_i18n( $everyalt_m['requests'] ) );
+								}
+								echo esc_html( implode( ' · ', $everyalt_parts ) );
+								?>
+							</td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php else : ?>
+			<p><?php esc_html_e( 'No spending recorded yet.', 'everyalt' ); ?></p>
+		<?php endif; ?>
+		<p class="description"><?php esc_html_e( 'Estimated from the tokens each request used and the provider’s published prices. Your provider’s invoice is authoritative.', 'everyalt' ); ?></p>
+
 		<h2><?php esc_html_e( 'Generation Log', 'everyalt' ); ?></h2>
 		<p class="description"><?php esc_html_e( 'Last 100 alt text generation attempts (successes and failures).', 'everyalt' ); ?></p>
 		<p>

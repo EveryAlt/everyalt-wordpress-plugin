@@ -117,7 +117,15 @@ class Every_Alt {
 
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-encryption.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-providers.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-language.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-usage.php';
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-everyalt-queue.php';
 		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'admin/class-everyalt-openai.php';
+
+		/**
+		 * The class responsible for front-end behavior (filling missing alt text in post content).
+		 */
+		require_once plugin_dir_path( dirname( __FILE__ ) ) . 'public/class-everyalt-public.php';
 
 		$this->loader = new Every_Alt_Loader();
 
@@ -150,6 +158,13 @@ class Every_Alt {
 	private function define_admin_hooks() {
 
 		$plugin_admin = new Every_Alt_Admin( $this->get_plugin_name(), $this->get_version() );
+		$queue        = new Every_Alt_Queue( $plugin_admin );
+		$plugin_admin->set_queue( $queue );
+
+		//background queue: WP-Cron runner (the browser runner is the /queue/process REST route)
+		$this->loader->add_filter( 'cron_schedules', 'Every_Alt_Queue', 'add_cron_schedule' );
+		$this->loader->add_action( Every_Alt_Queue::CRON_HOOK, $queue, 'process_from_cron' );
+		$this->loader->add_action( 'admin_notices', $plugin_admin, 'every_alt_budget_notice' );
 
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_styles' );
 		$this->loader->add_action( 'admin_enqueue_scripts', $plugin_admin, 'enqueue_scripts' );
@@ -196,7 +211,10 @@ class Every_Alt {
 	 * @access   private
 	 */
 	private function define_public_hooks() {
-		// Public-facing hooks can be registered here if needed.
+		$plugin_public = new Every_Alt_Public();
+
+		// Fill empty alt attributes in post content from the Media Library (WordPress 6.0+).
+		$this->loader->add_filter( 'wp_content_img_tag', $plugin_public, 'fill_missing_alt', 10, 3 );
 	}
 
 	/**

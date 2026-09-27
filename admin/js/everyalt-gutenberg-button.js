@@ -48,7 +48,10 @@
 					data: { media_id: attachmentId }
 				}).then(function (res) {
 					setIsBusy(false);
-					if (res && res.success && res.alt_text) {
+					if (res && res.success && res.decorative) {
+						setAttributes({ alt: '' });
+						notify('success', t('decorative', 'Marked as decorative: alt text left empty on purpose.'));
+					} else if (res && res.success && res.alt_text) {
 						setAttributes({ alt: res.alt_text });
 						notify('success', t('generated', 'Alt text generated.'));
 					} else {
