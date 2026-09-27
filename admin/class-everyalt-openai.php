@@ -20,6 +20,15 @@ class Every_Alt_OpenAI {
 	// Reasoning models use tokens for internal "thinking"; we need enough for reasoning + actual output.
 	const DEFAULT_MAX_COMPLETION_TOKENS = 1024;
 
+	/** Option: ask the model to flag purely decorative images (default on). */
+	const DECORATIVE_OPTION = 'every_alt_detect_decorative';
+
+	/** Exact answer the model gives for a decorative image. */
+	const DECORATIVE_MARKER = 'DECORATIVE';
+
+	/** Appended to the alt text prompt when decorative detection is on. Conservative on purpose: a wrongly skipped image is worse than a described divider. */
+	const DECORATIVE_INSTRUCTION = 'Exception: if the image is purely decorative and conveys no information (for example a divider line, spacer, background texture, or abstract pattern), reply with only the English word DECORATIVE. If in doubt, describe the image.';
+
 	/** Filter: change the model ID sent to the provider. Args: ( string $model_id, string $model_slug ). */
 	const FILTER_MODEL = 'everyalt_model';
 
@@ -122,21 +131,67 @@ class Every_Alt_OpenAI {
 	/**
 	 * Generate alt text for an attachment using the selected vision model. Image is sent as base64.
 	 *
+	 * When decorative-image detection is on (and $allow_decorative is true), the model may answer
+	 * DECORATIVE for images that convey no information. The result then has decorative = true and alt = ''.
+	 *
 	 * @param int        $attachment_id
-	 * @param array|null $metadata Unsaved attachment metadata (during upload), see get_image_path_for_vision().
-	 * @return object { alt: string|null, error: string|null, error_detail: string|null } Always returns object; check ->error for failure.
+	 * @param array|null $metadata         Unsaved attachment metadata (during upload), see get_image_path_for_vision().
+	 * @param bool       $allow_decorative False to always get a description (e.g. "Describe anyway").
+	 * @return object { alt: string|null, decorative: bool, error: string|null, error_detail: string|null } Always returns object; check ->error for failure.
 	 */
-	public function generate_alt( $attachment_id, $metadata = null ) {
+	public function generate_alt( $attachment_id, $metadata = null, $allow_decorative = true ) {
 		$saved_prompt = get_option( 'every_alt_vision_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_PROMPT;
-		$prompt       = apply_filters( 'everyalt_vision_prompt', $prompt );
+		$prompt       = self::with_language( $prompt, $attachment_id );
+		$detect       = $allow_decorative && self::decorative_detection_enabled();
+		if ( $detect ) {
+			// After the language instruction, so the marker word is not translated.
+			$prompt = rtrim( $prompt ) . ' ' . self::DECORATIVE_INSTRUCTION;
+		}
+		$prompt = apply_filters( 'everyalt_vision_prompt', $prompt, $attachment_id );
 
 		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
 		// Map shared 'text' field onto 'alt' for backward compatibility.
-		$result->alt = isset( $result->text ) ? $result->text : null;
+		$result->alt        = isset( $result->text ) ? $result->text : null;
+		$result->decorative = false;
 		unset( $result->text );
+		if ( $detect && is_string( $result->alt ) && self::is_decorative_marker( $result->alt ) ) {
+			$result->alt        = '';
+			$result->decorative = true;
+		}
 		return $result;
+	}
+
+	/**
+	 * Whether decorative-image detection is enabled in Settings (default on).
+	 *
+	 * @return bool
+	 */
+	public static function decorative_detection_enabled() {
+		return (bool) get_option( self::DECORATIVE_OPTION, 1 );
+	}
+
+	/**
+	 * Whether the model's answer is the decorative marker (tolerating case, punctuation, and quotes).
+	 *
+	 * @param string $text
+	 * @return bool
+	 */
+	public static function is_decorative_marker( $text ) {
+		return strtoupper( trim( $text, " \t\n\r.!\"'`*" ) ) === self::DECORATIVE_MARKER;
+	}
+
+	/**
+	 * Append the output-language instruction (see Every_Alt_Language) to a prompt.
+	 *
+	 * @param string $prompt
+	 * @param int    $attachment_id
+	 * @return string
+	 */
+	private static function with_language( $prompt, $attachment_id ) {
+		$instruction = Every_Alt_Language::prompt_instruction( $attachment_id );
+		return $instruction === '' ? $prompt : rtrim( $prompt ) . ' ' . $instruction;
 	}
 
 	/**
@@ -149,7 +204,8 @@ class Every_Alt_OpenAI {
 	public function generate_title( $attachment_id, $metadata = null ) {
 		$saved_prompt = get_option( 'every_alt_title_prompt', '' );
 		$prompt       = $saved_prompt !== '' ? $saved_prompt : self::DEFAULT_TITLE_PROMPT;
-		$prompt       = apply_filters( 'everyalt_title_prompt', $prompt );
+		$prompt       = self::with_language( $prompt, $attachment_id );
+		$prompt       = apply_filters( 'everyalt_title_prompt', $prompt, $attachment_id );
 
 		$result = $this->generate_text( $attachment_id, $prompt, $metadata );
 
@@ -258,7 +314,12 @@ class Every_Alt_OpenAI {
 		$json     = json_decode( $body_raw, true );
 		$usage_raw = isset( $json['usage'] ) ? $json['usage'] : null;
 		$usage    = self::format_usage( $usage_raw );
-		$cost     = $this->format_cost( $usage_raw );
+		$cost_usd = $this->cost_usd( $usage_raw );
+		$cost     = $cost_usd === null ? '' : number_format( $cost_usd * 100, 4 ) . '¢';
+		if ( $cost_usd !== null ) {
+			// Every billed request counts toward the monthly total, including failed or cut-off ones.
+			Every_Alt_Usage::record( $this->model_def['slug'], $cost_usd );
+		}
 
 		if ( $code < 200 || $code >= 300 ) {
 			$detail = $body_raw;
@@ -344,24 +405,22 @@ class Every_Alt_OpenAI {
 	}
 
 	/**
-	 * Format estimated cost for display in cents. Uses filtered input/output price per 1M tokens.
+	 * Estimated cost of a request in USD. Uses filtered input/output price per 1M tokens.
 	 *
 	 * @param array|null $usage API usage array with prompt_tokens, completion_tokens.
-	 * @return string Formatted cost e.g. "0.0123¢" or empty string if no usage.
+	 * @return float|null Null if the response had no usage.
 	 */
-	private function format_cost( $usage ) {
+	private function cost_usd( $usage ) {
 		if ( ! is_array( $usage ) ) {
-			return '';
+			return null;
 		}
 		$p = isset( $usage['prompt_tokens'] ) ? (int) $usage['prompt_tokens'] : 0;
 		$c = isset( $usage['completion_tokens'] ) ? (int) $usage['completion_tokens'] : 0;
 		if ( $p === 0 && $c === 0 ) {
-			return '';
+			return null;
 		}
 		$input_price  = (float) apply_filters( self::FILTER_INPUT_PRICE_PER_MILLION, $this->model_def['input_price'], $this->model_def['slug'] );
 		$output_price = (float) apply_filters( self::FILTER_OUTPUT_PRICE_PER_MILLION, $this->model_def['output_price'], $this->model_def['slug'] );
-		$cost_dollars = ( $p * $input_price / 1000000 ) + ( $c * $output_price / 1000000 );
-		$cost_cents   = $cost_dollars * 100;
-		return number_format( $cost_cents, 4 ) . '¢';
+		return ( $p * $input_price / 1000000 ) + ( $c * $output_price / 1000000 );
 	}
 }

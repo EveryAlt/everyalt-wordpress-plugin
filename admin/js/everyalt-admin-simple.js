@@ -100,89 +100,140 @@
 		});
 	}
 
-	// Bulk run: generate for selected, progress bar + per-item log, no reload
-	var bulkBtn = document.getElementById('everyalt-bulk-run');
-	if (bulkBtn) {
-		var progressEl = document.getElementById('everyalt-bulk-progress');
-		var progressTextEl = document.getElementById('everyalt-bulk-progress-text');
-		var progressFill = document.getElementById('everyalt-bulk-progress-fill');
-		var progressBar = document.querySelector('.everyalt-bulk-progress-bar');
-		var progressLog = document.getElementById('everyalt-bulk-progress-log');
-		bulkBtn.addEventListener('click', function() {
-			var checkboxes = document.querySelectorAll('.everyalt-bulk-checkbox:checked');
-			var ids = Array.prototype.map.call(checkboxes, function(cb) { return parseInt(cb.value, 10); });
-			if (!ids.length) return;
-			progressEl.classList.remove('hidden');
-			bulkBtn.disabled = true;
-			if (selectAllBtn) selectAllBtn.disabled = true;
-			if (selectNoneBtn) selectNoneBtn.disabled = true;
-			document.querySelectorAll('.everyalt-bulk-checkbox').forEach(function(cb) { cb.disabled = true; });
-			var total = ids.length;
-			var done = 0;
-			if (progressLog) progressLog.innerHTML = '';
-			function updateProgress() {
-				var pct = total ? Math.round((done / total) * 100) : 0;
-				if (progressTextEl) progressTextEl.textContent = done + ' / ' + total;
-				if (progressFill) progressFill.style.width = pct + '%';
-				if (progressBar) progressBar.setAttribute('aria-valuenow', pct);
+	// Background queue: "Generate for selected" / "Generate for all" add jobs, then this page helps work
+	// through them (WP-Cron also does, even after the page is closed). The panel shows progress on every
+	// EveryAlt tab, and resumes automatically if jobs are waiting when a page opens.
+	var queuePanel = document.getElementById('everyalt-queue-panel');
+	var queueText = document.getElementById('everyalt-queue-text');
+	var queueLog = document.getElementById('everyalt-queue-log');
+	var queueClearBtn = document.getElementById('everyalt-queue-clear');
+	var queueRunning = false;
+
+	function fmt(str, n) { return String(str).replace('%d', n); }
+
+	function renderQueue(status) {
+		if (!queuePanel || !status) return;
+		var due = status.due || 0;
+		var waiting = (status.total || 0) - due;
+		var msg;
+		if (status.paused === 'budget') {
+			msg = t('queuePausedBudget', 'Paused: monthly spending limit reached.');
+		} else if (status.paused === 'no_key') {
+			msg = t('queuePausedKey', 'Paused: add an API key in Settings.');
+		} else if (due > 0) {
+			msg = fmt(t('queueWorking', 'Generating in the background: %d remaining.'), due);
+			if (waiting > 0) msg += ' ' + fmt(t('queueWaiting', '%d waiting to retry.'), waiting);
+		} else if (waiting > 0) {
+			msg = fmt(t('queueWaiting', '%d waiting to retry.'), waiting);
+		} else {
+			msg = t('queueDone', 'All done.');
+		}
+		queueText.textContent = msg;
+		queuePanel.classList.remove('hidden');
+		queuePanel.classList.toggle('is-working', due > 0 && !status.paused);
+		queuePanel.classList.toggle('notice-warning', !!status.paused);
+		queuePanel.classList.toggle('notice-info', !status.paused);
+		if (queueClearBtn) queueClearBtn.classList.toggle('hidden', !status.total);
+	}
+
+	function markItem(r) {
+		var selector = r.type === 'title' ? '.everyalt-bulk-title-item' : '.everyalt-bulk-item';
+		var itemEl = document.querySelector(selector + '[data-media-id="' + r.media_id + '"]');
+		var text = r.success ? (r.decorative ? t('decorative', 'Marked as decorative') : r.text) : (r.message || t('error', 'Error'));
+		if (itemEl) {
+			var statusEl = itemEl.querySelector('.everyalt-bulk-item-status');
+			if (statusEl) {
+				statusEl.textContent = (r.success ? '\u2713 ' : '\u2717 ') + text;
+				statusEl.className = 'everyalt-bulk-item-status ' + (r.success ? 'success' : 'error');
 			}
-			var index = 0;
-			function next() {
-				if (index >= ids.length) {
-					progressEl.classList.add('hidden');
-					bulkBtn.disabled = false;
-					if (selectAllBtn) selectAllBtn.disabled = false;
-					if (selectNoneBtn) selectNoneBtn.disabled = false;
-					document.querySelectorAll('.everyalt-bulk-checkbox').forEach(function(cb) { cb.disabled = false; });
-					return;
+			var cb = itemEl.querySelector('input[type="checkbox"]');
+			if (cb && r.success) { cb.checked = false; cb.disabled = true; }
+			if (r.success) {
+				var label = itemEl.querySelector('label');
+				if (label) label.style.opacity = '0.5';
+			}
+		}
+		if (queueLog) {
+			var li = document.createElement('li');
+			li.className = r.success ? 'success' : 'error';
+			li.textContent = '#' + r.media_id + ': ' + text;
+			queueLog.insertBefore(li, queueLog.firstChild);
+			while (queueLog.children.length > 50) queueLog.removeChild(queueLog.lastChild);
+		}
+	}
+
+	// Keep calling /queue/process while jobs are due. If WP-Cron holds the lock, check back shortly.
+	function runQueue() {
+		if (queueRunning) return;
+		queueRunning = true;
+		(function step() {
+			request('POST', '/everyalt-api/v1/queue/process')
+				.then(function(data) {
+					(data.results || []).forEach(markItem);
+					renderQueue(data.status);
+					var st = data.status || {};
+					if (st.paused || !st.total) { queueRunning = false; return; }
+					if (data.locked || !st.due) {
+						setTimeout(step, st.due ? 5000 : 30000);
+						return;
+					}
+					step();
+				})
+				.catch(function() {
+					// Network hiccup or timeout: WP-Cron keeps going; try again in a bit.
+					setTimeout(step, 15000);
+				});
+		})();
+	}
+
+	function addToQueue(body, btn) {
+		if (btn) btn.disabled = true;
+		return request('POST', '/everyalt-api/v1/queue', body)
+			.then(function(data) {
+				if (btn) btn.disabled = false;
+				if (queueLog) {
+					var li = document.createElement('li');
+					li.textContent = data.added ? fmt(t('queueAdded', 'Added %d images to the queue.'), data.added) : t('queueNothing', 'Those images were already queued.');
+					queueLog.insertBefore(li, queueLog.firstChild);
 				}
-				var id = ids[index];
-				var itemEl = document.querySelector('.everyalt-bulk-item[data-media-id="' + id + '"]');
-				var statusEl = itemEl ? itemEl.querySelector('.everyalt-bulk-item-status') : null;
-				request('POST', '/everyalt-api/v1/bulk_generate_alt', { media_id: id })
-					.then(function(data) {
-						done++;
-						updateProgress();
-						var success = data && data.success;
-						var msg = success ? (data.alt_text || '') : (data && data.message) ? data.message : '';
-						if (statusEl) {
-							statusEl.textContent = success ? '\u2713 ' + (data.alt_text || '') : '\u2717 ' + (data.message || t('error', 'Error'));
-							statusEl.className = 'everyalt-bulk-item-status ' + (success ? 'success' : 'error');
-						}
-						if (progressLog) {
-							var li = document.createElement('li');
-							li.className = success ? 'success' : 'error';
-							li.textContent = '#' + id + ': ' + (success ? (data.alt_text || '') : (data.message || t('error', 'Error')));
-							progressLog.appendChild(li);
-						}
-						if (success && itemEl) {
-							var label = itemEl.querySelector('label');
-							if (label) label.style.opacity = '0.5';
-						}
-						index++;
-						next();
-					})
-					.catch(function(err) {
-						done++;
-						updateProgress();
-						var errMsg = err && err.message ? err.message : t('requestFailed', 'Request failed');
-						if (statusEl) {
-							statusEl.textContent = '\u2717 ' + errMsg;
-							statusEl.className = 'everyalt-bulk-item-status error';
-						}
-						if (progressLog) {
-							var li = document.createElement('li');
-							li.className = 'error';
-							li.textContent = '#' + id + ': ' + errMsg;
-							progressLog.appendChild(li);
-						}
-						index++;
-						next();
-					});
-			}
-			updateProgress();
-			next();
+				renderQueue(data.status);
+				runQueue();
+			})
+			.catch(function(err) {
+				if (btn) btn.disabled = false;
+				renderQueue({ total: 0 });
+				queueText.textContent = t('errorPrefix', 'Error:') + ' ' + (err && err.message ? err.message : t('requestFailed', 'Request failed'));
+			});
+	}
+
+	document.querySelectorAll('.everyalt-queue-selected').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			var boxes = document.querySelectorAll(btn.getAttribute('data-checkboxes') + ':checked');
+			var ids = Array.prototype.map.call(boxes, function(cb) { return parseInt(cb.value, 10); });
+			if (!ids.length) return;
+			addToQueue({ type: btn.getAttribute('data-type'), media_ids: ids }, btn);
 		});
+	});
+
+	document.querySelectorAll('.everyalt-queue-all').forEach(function(btn) {
+		btn.addEventListener('click', function() {
+			addToQueue({ type: btn.getAttribute('data-type'), all: true }, btn);
+		});
+	});
+
+	if (queueClearBtn) {
+		queueClearBtn.addEventListener('click', function() {
+			request('DELETE', '/everyalt-api/v1/queue').then(function(status) {
+				renderQueue(status);
+				queueText.textContent = t('queueCleared', 'Queue cleared.');
+			});
+		});
+	}
+
+	var initialQueue = typeof everyaltAdmin !== 'undefined' ? everyaltAdmin.queue : null;
+	if (initialQueue && initialQueue.total) {
+		renderQueue(initialQueue);
+		if (!initialQueue.paused) runQueue();
 	}
 
 	// Review Alt Text: Save edited alt (AJAX)
@@ -225,13 +276,15 @@
 			var statusEl = item ? item.querySelector('.everyalt-review-status') : null;
 			btn.disabled = true;
 			if (statusEl) statusEl.textContent = '';
-			request('POST', '/everyalt-api/v1/bulk_generate_alt', { media_id: mediaId })
+			var body = { media_id: mediaId };
+			if (btn.getAttribute('data-describe')) body.describe = true;
+			request('POST', '/everyalt-api/v1/bulk_generate_alt', body)
 				.then(function(data) {
 					btn.disabled = false;
 					if (data && data.success && data.alt_text !== undefined) {
 						if (textarea) textarea.value = data.alt_text;
 						if (statusEl) {
-							statusEl.textContent = t('regenerated', 'Regenerated!');
+							statusEl.textContent = data.decorative ? t('decorative', 'Marked as decorative') : t('regenerated', 'Regenerated!');
 							statusEl.className = 'everyalt-review-status success';
 							setTimeout(function() { statusEl.textContent = ''; statusEl.className = 'everyalt-review-status'; }, 2000);
 						}
@@ -263,90 +316,6 @@
 	if (titleSelectNoneBtn) {
 		titleSelectNoneBtn.addEventListener('click', function() {
 			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.checked = false; });
-		});
-	}
-
-	// Bulk Titles run: generate titles for selected, progress bar + per-item log, no reload
-	var bulkTitleBtn = document.getElementById('everyalt-bulk-title-run');
-	if (bulkTitleBtn) {
-		var titleProgressEl = document.getElementById('everyalt-bulk-title-progress');
-		var titleProgressTextEl = document.getElementById('everyalt-bulk-title-progress-text');
-		var titleProgressFill = document.getElementById('everyalt-bulk-title-progress-fill');
-		var titleProgressBar = titleProgressEl ? titleProgressEl.querySelector('.everyalt-bulk-progress-bar') : null;
-		var titleProgressLog = document.getElementById('everyalt-bulk-title-progress-log');
-		bulkTitleBtn.addEventListener('click', function() {
-			var checkboxes = document.querySelectorAll('.everyalt-bulk-title-checkbox:checked');
-			var ids = Array.prototype.map.call(checkboxes, function(cb) { return parseInt(cb.value, 10); });
-			if (!ids.length) return;
-			titleProgressEl.classList.remove('hidden');
-			bulkTitleBtn.disabled = true;
-			if (titleSelectAllBtn) titleSelectAllBtn.disabled = true;
-			if (titleSelectNoneBtn) titleSelectNoneBtn.disabled = true;
-			document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.disabled = true; });
-			var total = ids.length;
-			var done = 0;
-			if (titleProgressLog) titleProgressLog.innerHTML = '';
-			function updateProgress() {
-				var pct = total ? Math.round((done / total) * 100) : 0;
-				if (titleProgressTextEl) titleProgressTextEl.textContent = done + ' / ' + total;
-				if (titleProgressFill) titleProgressFill.style.width = pct + '%';
-				if (titleProgressBar) titleProgressBar.setAttribute('aria-valuenow', pct);
-			}
-			var index = 0;
-			function next() {
-				if (index >= ids.length) {
-					titleProgressEl.classList.add('hidden');
-					bulkTitleBtn.disabled = false;
-					if (titleSelectAllBtn) titleSelectAllBtn.disabled = false;
-					if (titleSelectNoneBtn) titleSelectNoneBtn.disabled = false;
-					document.querySelectorAll('.everyalt-bulk-title-checkbox').forEach(function(cb) { cb.disabled = false; });
-					return;
-				}
-				var id = ids[index];
-				var itemEl = document.querySelector('.everyalt-bulk-title-item[data-media-id="' + id + '"]');
-				var statusEl = itemEl ? itemEl.querySelector('.everyalt-bulk-item-status') : null;
-				request('POST', '/everyalt-api/v1/bulk_generate_title', { media_id: id })
-					.then(function(data) {
-						done++;
-						updateProgress();
-						var success = data && data.success;
-						if (statusEl) {
-							statusEl.textContent = success ? '✓ ' + (data.title || '') : '✗ ' + (data.message || t('error', 'Error'));
-							statusEl.className = 'everyalt-bulk-item-status ' + (success ? 'success' : 'error');
-						}
-						if (titleProgressLog) {
-							var li = document.createElement('li');
-							li.className = success ? 'success' : 'error';
-							li.textContent = '#' + id + ': ' + (success ? (data.title || '') : (data.message || t('error', 'Error')));
-							titleProgressLog.appendChild(li);
-						}
-						if (success && itemEl) {
-							var label = itemEl.querySelector('label');
-							if (label) label.style.opacity = '0.5';
-						}
-						index++;
-						next();
-					})
-					.catch(function(err) {
-						done++;
-						updateProgress();
-						var errMsg = err && err.message ? err.message : t('requestFailed', 'Request failed');
-						if (statusEl) {
-							statusEl.textContent = '✗ ' + errMsg;
-							statusEl.className = 'everyalt-bulk-item-status error';
-						}
-						if (titleProgressLog) {
-							var li = document.createElement('li');
-							li.className = 'error';
-							li.textContent = '#' + id + ': ' + errMsg;
-							titleProgressLog.appendChild(li);
-						}
-						index++;
-						next();
-					});
-			}
-			updateProgress();
-			next();
 		});
 	}
 

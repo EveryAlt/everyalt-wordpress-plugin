@@ -36,6 +36,57 @@ class Every_Alt_Admin {
 	const GENERATION_LOG_OPTION = 'every_alt_generation_log';
 	const GENERATION_LOG_MAX    = 100;
 
+	/** Attachment meta: set when the model judged the image purely decorative (alt left empty on purpose). */
+	const DECORATIVE_META = '_everyalt_decorative';
+
+	/** Option: 'background' (default) or 'immediate' generation for new uploads. */
+	const UPLOAD_MODE_OPTION = 'every_alt_upload_mode';
+
+	/** @var Every_Alt_Queue|null */
+	private $queue;
+
+	/**
+	 * @param Every_Alt_Queue $queue
+	 */
+	public function set_queue( $queue ) {
+		$this->queue = $queue;
+	}
+
+	/**
+	 * @return string 'background' or 'immediate'.
+	 */
+	public static function upload_mode() {
+		return get_option( self::UPLOAD_MODE_OPTION, 'background' ) === 'immediate' ? 'immediate' : 'background';
+	}
+
+	/**
+	 * Why the last generation call returned null: 'no_key', 'budget', 'invalid_image', 'api', or '' on success.
+	 * The queue uses this to decide whether to retry, drop, or pause.
+	 *
+	 * @var string
+	 */
+	private $last_failure = '';
+
+	/**
+	 * @return string See $last_failure.
+	 */
+	public function every_alt_last_failure() {
+		return $this->last_failure;
+	}
+
+	/**
+	 * Log/notice text used when the monthly spending limit stops generation.
+	 *
+	 * @return string
+	 */
+	public function every_alt_budget_reached_message() {
+		return sprintf(
+			/* translators: %s: monthly spending limit, e.g. $5.00 */
+			__( 'Skipped: monthly spending limit of %s reached. Generation resumes next month, or raise the limit in Settings.', 'everyalt' ),
+			Every_Alt_Usage::format_usd( Every_Alt_Usage::budget() )
+		);
+	}
+
 	/**
 	 * Append an entry to the generation log (last 100 entries).
 	 *
@@ -214,6 +265,26 @@ class Every_Alt_Admin {
 	}
 
 	/**
+	 * Tell admins when the monthly spending limit has paused generation (auto-generate would otherwise stop silently).
+	 */
+	public function every_alt_budget_notice() {
+		if ( ! current_user_can( 'manage_options' ) || ! Every_Alt_Usage::budget_reached() ) {
+			return;
+		}
+		$url = admin_url( 'upload.php?page=everyalt&tab=settings' );
+		echo '<div class="notice notice-warning"><p>' . wp_kses(
+			sprintf(
+				/* translators: 1: spent this month, 2: monthly limit, 3: settings URL */
+				__( 'EveryAlt has paused: this month’s estimated spend (%1$s) reached your monthly limit of %2$s. New images will be processed next month, or you can <a href="%3$s">raise the limit</a>.', 'everyalt' ),
+				esc_html( Every_Alt_Usage::format_usd( Every_Alt_Usage::month_total() ) ),
+				esc_html( Every_Alt_Usage::format_usd( Every_Alt_Usage::budget() ) ),
+				esc_url( $url )
+			),
+			array( 'a' => array( 'href' => true ) )
+		) . '</p></div>';
+	}
+
+	/**
 	 * AJAX: Validate a provider's API key (key from POST, or that provider's stored key if empty).
 	 */
 	public function ajax_validate_key() {
@@ -347,7 +418,17 @@ class Every_Alt_Admin {
 				'restNonce'        => wp_create_nonce( 'wp_rest' ),
 				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
 				'validateKeyNonce' => wp_create_nonce( 'everyalt_validate_key' ),
+				'queue'            => Every_Alt_Queue::status(),
 				'i18n'             => array(
+					'queueWorking'     => __( 'Generating in the background: %d remaining. You can leave this page; it continues on its own.', 'everyalt' ),
+					'queueWaiting'     => __( '%d waiting to retry. They will be tried again automatically.', 'everyalt' ),
+					'queueDone'        => __( 'All done.', 'everyalt' ),
+					'queuePausedBudget' => __( 'Paused: monthly spending limit reached. Raise the limit in Settings or wait until next month.', 'everyalt' ),
+					'queuePausedKey'   => __( 'Paused: add an API key for the selected model in Settings.', 'everyalt' ),
+					'queueAdded'       => __( 'Added %d images to the queue.', 'everyalt' ),
+					'queueNothing'     => __( 'Those images were already queued.', 'everyalt' ),
+					'queueCleared'     => __( 'Queue cleared.', 'everyalt' ),
+					'decorative'       => __( 'Marked as decorative (alt text left empty on purpose)', 'everyalt' ),
 					'error'            => __( 'Error', 'everyalt' ),
 					'errorPrefix'      => __( 'Error:', 'everyalt' ),
 					'requestFailed'    => __( 'Request failed', 'everyalt' ),
@@ -373,6 +454,7 @@ class Every_Alt_Admin {
 			'generating'  => __( 'Generating…', 'everyalt' ),
 			'generated'   => __( 'Alt text generated.', 'everyalt' ),
 			'failed'      => __( 'Could not generate alt text.', 'everyalt' ),
+			'decorative'  => __( 'Marked as decorative: alt text left empty on purpose.', 'everyalt' ),
 			'errorPrefix' => __( 'Error:', 'everyalt' ),
 		);
 	}
@@ -457,13 +539,26 @@ class Every_Alt_Admin {
 			return $metadata;
 		}
 
-		// Auto alt text: only when alt is currently empty.
-		if ( get_option( $this->option_name . '_auto' ) && get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ) === '' ) {
-			$this->every_alt_auto_add_image_alt_text( $attachment_id, false, $metadata );
+		$want_alt   = get_option( $this->option_name . '_auto' ) && get_post_meta( $attachment_id, '_wp_attachment_image_alt', true ) === '';
+		$want_title = get_option( $this->option_name . '_auto_title' ) && $this->every_alt_title_is_filename_like( $attachment_id );
+
+		// Background (default): the upload finishes right away and the queue generates shortly after.
+		// Posts still show the alt text once it exists, via Every_Alt_Public::fill_missing_alt().
+		if ( self::upload_mode() === 'background' && $this->queue ) {
+			if ( $want_alt ) {
+				$this->queue->enqueue( array( $attachment_id ), 'alt' );
+			}
+			if ( $want_title ) {
+				$this->queue->enqueue( array( $attachment_id ), 'title' );
+			}
+			return $metadata;
 		}
 
-		// Auto title: only when the current title still looks like the raw filename.
-		if ( get_option( $this->option_name . '_auto_title' ) && $this->every_alt_title_is_filename_like( $attachment_id ) ) {
+		// Immediate: the upload request waits for the model.
+		if ( $want_alt ) {
+			$this->every_alt_auto_add_image_alt_text( $attachment_id, false, $metadata );
+		}
+		if ( $want_title ) {
 			$this->every_alt_auto_add_image_title( $attachment_id, false, $metadata );
 		}
 
@@ -471,27 +566,36 @@ class Every_Alt_Admin {
 	}
 
 	//auto alt – direct OpenAI Vision API, image sent as base64 (medium size)
-	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null, $metadata = null ) {
+	public function every_alt_auto_add_image_alt_text( $attachment_ID, $bulk = null, $metadata = null, $allow_decorative = true ) {
+		$this->last_failure = '';
 		$api_key = $this->get_api_key();
 		$auto    = get_option( $this->option_name . '_auto' );
 		if ( $bulk ) {
 			$auto = 1;
 		}
 		if ( ! $api_key || ! $auto ) {
+			$this->last_failure = 'no_key';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: no API key or auto-generate disabled.', 'everyalt' ), '' );
 			return null;
 		}
 		if ( ! $this->every_alt_validate_token() ) {
+			$this->last_failure = 'no_key';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: API key validation failed.', 'everyalt' ), '' );
 			return null;
 		}
+		if ( Every_Alt_Usage::budget_reached() ) {
+			$this->last_failure = 'budget';
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', '' . $this->every_alt_budget_reached_message(), '' );
+			return null;
+		}
 		if ( ! $this->every_alt_is_valid_image( $attachment_ID, $metadata ) ) {
+			$this->last_failure = 'invalid_image';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
 			return null;
 		}
 
 		$openai        = new Every_Alt_OpenAI( $api_key );
-		$generated_alt = $openai->generate_alt( $attachment_ID, $metadata );
+		$generated_alt = $openai->generate_alt( $attachment_ID, $metadata, $allow_decorative );
 
 		if ( ! empty( $generated_alt->error ) ) {
 			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
@@ -501,10 +605,19 @@ class Every_Alt_Admin {
 			if ( $detail_for_log !== '' && ( strpos( $detail_for_log, '/' ) !== false || strpos( $detail_for_log, '\\' ) !== false ) ) {
 				$detail_for_log = '';
 			}
+			$this->last_failure = 'api';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', $generated_alt->error, $detail_for_log, $usage, $cost );
 			return null;
 		}
+		if ( ! empty( $generated_alt->decorative ) ) {
+			// Decorative images get deliberately empty alt text (WCAG). The flag stops bulk generation re-queueing them.
+			update_post_meta( $attachment_ID, '_wp_attachment_image_alt', '' );
+			update_post_meta( $attachment_ID, self::DECORATIVE_META, 1 );
+			$this->every_alt_add_generation_log( $attachment_ID, 'success', __( 'Marked as decorative (alt text left empty on purpose).', 'everyalt' ), '', $generated_alt->usage, $generated_alt->cost );
+			return $bulk ? $generated_alt : '';
+		}
 		if ( empty( $generated_alt->alt ) ) {
+			$this->last_failure = 'api';
 			$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
 			$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( 'No alt text returned from API.', 'everyalt' ), '', $usage, $cost );
@@ -512,6 +625,7 @@ class Every_Alt_Admin {
 		}
 
 		update_post_meta( $attachment_ID, '_wp_attachment_image_alt', $generated_alt->alt );
+		delete_post_meta( $attachment_ID, self::DECORATIVE_META );
 		$usage = isset( $generated_alt->usage ) ? $generated_alt->usage : '';
 		$cost  = isset( $generated_alt->cost ) ? $generated_alt->cost : '';
 		$this->every_alt_add_generation_log( $attachment_ID, 'success', $generated_alt->alt, '', $usage, $cost );
@@ -524,20 +638,29 @@ class Every_Alt_Admin {
 
 	//auto title – direct OpenAI Vision API, image sent as base64 (medium size)
 	public function every_alt_auto_add_image_title( $attachment_ID, $bulk = null, $metadata = null ) {
+		$this->last_failure = '';
 		$api_key = $this->get_api_key();
 		$auto    = get_option( $this->option_name . '_auto_title' );
 		if ( $bulk ) {
 			$auto = 1;
 		}
 		if ( ! $api_key || ! $auto ) {
+			$this->last_failure = 'no_key';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: no API key or auto-generate disabled.', 'everyalt' ), '' );
 			return null;
 		}
 		if ( ! $this->every_alt_validate_token() ) {
+			$this->last_failure = 'no_key';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: API key validation failed.', 'everyalt' ), '' );
 			return null;
 		}
+		if ( Every_Alt_Usage::budget_reached() ) {
+			$this->last_failure = 'budget';
+			$this->every_alt_add_generation_log( $attachment_ID, 'error', '[Title] ' . $this->every_alt_budget_reached_message(), '' );
+			return null;
+		}
 		if ( ! $this->every_alt_is_valid_image( $attachment_ID, $metadata ) ) {
+			$this->last_failure = 'invalid_image';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] Skipped: not a valid image or file exceeds 4MB.', 'everyalt' ), '' );
 			return null;
 		}
@@ -553,10 +676,12 @@ class Every_Alt_Admin {
 			if ( $detail_for_log !== '' && ( strpos( $detail_for_log, '/' ) !== false || strpos( $detail_for_log, '\\' ) !== false ) ) {
 				$detail_for_log = '';
 			}
+			$this->last_failure = 'api';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', '[Title] ' . $generated_title->error, $detail_for_log, $usage, $cost );
 			return null;
 		}
 		if ( empty( $generated_title->title ) ) {
+			$this->last_failure = 'api';
 			$usage = isset( $generated_title->usage ) ? $generated_title->usage : '';
 			$cost  = isset( $generated_title->cost ) ? $generated_title->cost : '';
 			$this->every_alt_add_generation_log( $attachment_ID, 'error', __( '[Title] No title returned from API.', 'everyalt' ), '', $usage, $cost );
@@ -744,28 +869,8 @@ class Every_Alt_Admin {
 	 * @return array { images: WP_Post[], total: int, pages: int, current: int }
 	 */
 	private function every_alt_get_images_by_alt( $with_alt ) {
-		if ( $with_alt ) {
-			$meta_query = array(
-				array(
-					'key'     => '_wp_attachment_image_alt',
-					'value'   => '',
-					'compare' => '!=',
-				),
-			);
-		} else {
-			$meta_query = array(
-				'relation' => 'OR',
-				array(
-					'key'     => '_wp_attachment_image_alt',
-					'compare' => 'NOT EXISTS',
-				),
-				array(
-					'key'   => '_wp_attachment_image_alt',
-					'value' => '',
-				),
-			);
-		}
-		$current = $this->every_alt_current_page();
+		$meta_query = $this->every_alt_alt_meta_query( $with_alt );
+		$current    = $this->every_alt_current_page();
 		$query   = new WP_Query( array(
 			'post_type'              => 'attachment',
 			'post_mime_type'         => 'image',
@@ -784,15 +889,73 @@ class Every_Alt_Admin {
 	}
 
 	/**
-	 * One page of image attachments whose title does (or does not) look like the raw upload filename.
+	 * Meta query for images with alt text (including ones marked decorative, which are reviewed there),
+	 * or missing it (excluding decorative ones, which are empty on purpose).
+	 *
+	 * @param bool $with_alt
+	 * @return array
+	 */
+	private function every_alt_alt_meta_query( $with_alt ) {
+		if ( $with_alt ) {
+			return array(
+				'relation' => 'OR',
+				array(
+					'key'     => '_wp_attachment_image_alt',
+					'value'   => '',
+					'compare' => '!=',
+				),
+				array(
+					'key'     => self::DECORATIVE_META,
+					'compare' => 'EXISTS',
+				),
+			);
+		}
+		return array(
+			'relation' => 'AND',
+			array(
+				'relation' => 'OR',
+				array(
+					'key'     => '_wp_attachment_image_alt',
+					'compare' => 'NOT EXISTS',
+				),
+				array(
+					'key'   => '_wp_attachment_image_alt',
+					'value' => '',
+				),
+			),
+			array(
+				'key'     => self::DECORATIVE_META,
+				'compare' => 'NOT EXISTS',
+			),
+		);
+	}
+
+	/**
+	 * IDs of every image missing alt text (all pages), for "Queue all".
+	 *
+	 * @return int[]
+	 */
+	private function every_alt_missing_alt_ids() {
+		return array_map( 'intval', get_posts( array(
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'post_status'    => 'any',
+			'posts_per_page' => -1,
+			'fields'         => 'ids',
+			'meta_query'     => $this->every_alt_alt_meta_query( false ), // phpcs:ignore WordPress.DB.SlowDBQuery
+		) ) );
+	}
+
+	/**
+	 * IDs of every image whose title does (or does not) look like the raw upload filename, newest first.
 	 *
 	 * The filename check can't be expressed in SQL, so this scans a lightweight (ID, title, file) row per
 	 * image in one query instead of loading every attachment post.
 	 *
-	 * @param bool $filename_like True for images needing a title, false for images with a custom title.
-	 * @return array { images: WP_Post[], total: int, pages: int, current: int }
+	 * @param bool $filename_like
+	 * @return int[]
 	 */
-	private function every_alt_get_images_by_title( $filename_like ) {
+	private function every_alt_title_ids( $filename_like ) {
 		global $wpdb;
 		$rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 			"SELECT p.ID, p.post_title, pm.meta_value AS file
@@ -809,6 +972,20 @@ class Every_Alt_Admin {
 				$ids[] = (int) $row->ID;
 			}
 		}
+		return $ids;
+	}
+
+	/**
+	 * One page of image attachments whose title does (or does not) look like the raw upload filename.
+	 *
+	 * The filename check can't be expressed in SQL, so this scans a lightweight (ID, title, file) row per
+	 * image in one query instead of loading every attachment post.
+	 *
+	 * @param bool $filename_like True for images needing a title, false for images with a custom title.
+	 * @return array { images: WP_Post[], total: int, pages: int, current: int }
+	 */
+	private function every_alt_get_images_by_title( $filename_like ) {
+		$ids = $this->every_alt_title_ids( $filename_like );
 
 		$total   = count( $ids );
 		$pages   = (int) ceil( $total / self::IMAGES_PER_PAGE );
@@ -985,6 +1162,22 @@ class Every_Alt_Admin {
 		}
 		update_option( $this->option_name . '_auto', ! empty( $_POST[ $this->option_name . '_auto' ] ) ? 1 : 0 );
 		update_option( $this->option_name . '_auto_title', ! empty( $_POST[ $this->option_name . '_auto_title' ] ) ? 1 : 0 );
+		update_option( Every_Alt_Public::FILL_OPTION, ! empty( $_POST[ Every_Alt_Public::FILL_OPTION ] ) ? 1 : 0 );
+		update_option( Every_Alt_OpenAI::DECORATIVE_OPTION, ! empty( $_POST[ Every_Alt_OpenAI::DECORATIVE_OPTION ] ) ? 1 : 0 );
+		if ( isset( $_POST[ self::UPLOAD_MODE_OPTION ] ) ) {
+			update_option( self::UPLOAD_MODE_OPTION, $_POST[ self::UPLOAD_MODE_OPTION ] === 'immediate' ? 'immediate' : 'background' );
+		}
+		if ( isset( $_POST[ Every_Alt_Usage::BUDGET_OPTION ] ) ) {
+			$budget = sanitize_text_field( wp_unslash( $_POST[ Every_Alt_Usage::BUDGET_OPTION ] ) );
+			$budget = $budget === '' ? '' : max( 0, round( (float) $budget, 2 ) );
+			update_option( Every_Alt_Usage::BUDGET_OPTION, $budget ? $budget : '' );
+		}
+		if ( isset( $_POST[ Every_Alt_Language::OPTION ] ) ) {
+			$language = sanitize_text_field( wp_unslash( $_POST[ Every_Alt_Language::OPTION ] ) );
+			if ( $language === '' || isset( Every_Alt_Language::languages()[ $language ] ) ) {
+				update_option( Every_Alt_Language::OPTION, $language );
+			}
+		}
 		if ( isset( $_POST['every_alt_vision_prompt'] ) ) {
 			update_option( 'every_alt_vision_prompt', sanitize_textarea_field( wp_unslash( $_POST['every_alt_vision_prompt'] ) ) );
 		}
@@ -1032,7 +1225,56 @@ class Every_Alt_Admin {
 					'minimum'           => 1,
 					'sanitize_callback' => 'absint',
 				),
+				// True to always get a description ("Describe anyway" on an image marked decorative).
+				'describe' => array(
+					'required' => false,
+					'type'     => 'boolean',
+					'default'  => false,
+				),
 			),
+		) );
+
+		register_rest_route( 'everyalt-api/v1', '/queue', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'every_alt_rest_queue_status' ),
+				'permission_callback' => array( $this, 'every_alt_rest_can_manage' ),
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'every_alt_rest_queue_add' ),
+				'permission_callback' => array( $this, 'every_alt_rest_can_manage' ),
+				'args'                => array(
+					'type'      => array(
+						'required' => true,
+						'type'     => 'string',
+						'enum'     => Every_Alt_Queue::TYPES,
+					),
+					'media_ids' => array(
+						'required' => false,
+						'type'     => 'array',
+						'items'    => array( 'type' => 'integer' ),
+						'default'  => array(),
+					),
+					// Queue every image that needs this type, across all pages.
+					'all'       => array(
+						'required' => false,
+						'type'     => 'boolean',
+						'default'  => false,
+					),
+				),
+			),
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( $this, 'every_alt_rest_queue_clear' ),
+				'permission_callback' => array( $this, 'every_alt_rest_can_manage' ),
+			),
+		) );
+
+		register_rest_route( 'everyalt-api/v1', '/queue/process', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( $this, 'every_alt_rest_queue_process' ),
+			'permission_callback' => array( $this, 'every_alt_rest_can_manage' ),
 		) );
 
 		register_rest_route( 'everyalt-api/v1', '/save_title', array(
@@ -1090,13 +1332,16 @@ class Every_Alt_Admin {
 
 	public function bulk_generate_alt( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
-		$result   = $this->every_alt_auto_add_image_alt_text( $media_id, true );
+		$result   = $this->every_alt_auto_add_image_alt_text( $media_id, true, null, ! $request->get_param( 'describe' ) );
 
 		if ( $result && isset( $result->alt ) ) {
+			// Generated here, so drop any queued job for it.
+			Every_Alt_Queue::dequeue( $media_id, 'alt' );
 			$response = array(
-				'media_id' => $media_id,
-				'success'  => true,
-				'alt_text' => $result->alt,
+				'media_id'   => $media_id,
+				'success'    => true,
+				'alt_text'   => $result->alt,
+				'decorative' => ! empty( $result->decorative ),
 			);
 		} else {
 			$last_error = $this->every_alt_get_last_log_message_for_attachment( $media_id );
@@ -1113,6 +1358,9 @@ class Every_Alt_Admin {
 	public function bulk_generate_title( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
 		$result   = $this->every_alt_auto_add_image_title( $media_id, true );
+		if ( $result ) {
+			Every_Alt_Queue::dequeue( $media_id, 'title' );
+		}
 
 		if ( $result && isset( $result->title ) ) {
 			$response = array(
@@ -1133,12 +1381,48 @@ class Every_Alt_Admin {
 	}
 
 	/**
+	 * REST permission for queue routes: the admin page's users.
+	 *
+	 * @return bool
+	 */
+	public function every_alt_rest_can_manage() {
+		return current_user_can( 'manage_options' );
+	}
+
+	public function every_alt_rest_queue_status() {
+		return new WP_REST_Response( Every_Alt_Queue::status(), 200 );
+	}
+
+	public function every_alt_rest_queue_add( $request ) {
+		$type = $request->get_param( 'type' );
+		if ( $request->get_param( 'all' ) ) {
+			$ids = $type === 'alt' ? $this->every_alt_missing_alt_ids() : $this->every_alt_title_ids( true );
+		} else {
+			$ids = array_map( 'absint', (array) $request->get_param( 'media_ids' ) );
+		}
+		$added = $this->queue->enqueue( $ids, $type );
+		return new WP_REST_Response( array( 'added' => $added, 'status' => Every_Alt_Queue::status() ), 200 );
+	}
+
+	public function every_alt_rest_queue_clear() {
+		Every_Alt_Queue::clear();
+		return new WP_REST_Response( Every_Alt_Queue::status(), 200 );
+	}
+
+	/**
+	 * Browser runner: process jobs for up to ~20 seconds and report each result.
+	 */
+	public function every_alt_rest_queue_process() {
+		return new WP_REST_Response( $this->queue->process( 20 ), 200 );
+	}
+
+	/**
 	 * Get the message from the most recent generation log entry for an attachment.
 	 *
 	 * @param int $attachment_id
 	 * @return string Empty string if none.
 	 */
-	private function every_alt_get_last_log_message_for_attachment( $attachment_id ) {
+	public function every_alt_get_last_log_message_for_attachment( $attachment_id ) {
 		$log = get_option( self::GENERATION_LOG_OPTION, array() );
 		if ( ! is_array( $log ) ) {
 			return '';
@@ -1155,6 +1439,11 @@ class Every_Alt_Admin {
 		$media_id = absint( $request->get_param( 'media_id' ) );
 		$alt_text = sanitize_text_field( $request->get_param( 'alt_text' ) );
 		$update = update_post_meta( $media_id, '_wp_attachment_image_alt', $alt_text );
+		if ( $alt_text !== '' ) {
+			// A person wrote alt text: it is no longer "decorative", and needs no queued generation.
+			delete_post_meta( $media_id, self::DECORATIVE_META );
+			Every_Alt_Queue::dequeue( $media_id, 'alt' );
+		}
 		$response = [
 			'alt' => $alt_text,
 			'media_id' => $media_id,
@@ -1166,6 +1455,7 @@ class Every_Alt_Admin {
 	public function every_alt_save_title( $request ) {
 		$media_id = absint( $request->get_param( 'media_id' ) );
 		$title    = sanitize_text_field( $request->get_param( 'title' ) );
+		Every_Alt_Queue::dequeue( $media_id, 'title' );
 		wp_update_post( array(
 			'ID'         => $media_id,
 			'post_title' => $title,

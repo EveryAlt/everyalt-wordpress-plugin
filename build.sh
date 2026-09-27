@@ -31,7 +31,8 @@ REF="${1:-HEAD}"
 MAIN_FILE="$(git show "${REF}:everyalt.php")"
 VERSION="$(sed -nE "s/.*define\( *'EVERY_ALT_VERSION', *'([^']+)'.*/\1/p" <<<"${MAIN_FILE}")"
 HEADER_VERSION="$(sed -nE 's/^[ *]*Version: *([^ ]+).*/\1/p' <<<"${MAIN_FILE}")"
-README_VERSION="$(git show "${REF}:README.md" | sed -nE 's/.*badge\/EveryAlt-([0-9][^-]*)-.*/\1/p' | head -1)"
+# Badge text is shields.io-escaped: a literal "-" is written "--" (e.g. EveryAlt-1.1.0--beta.1-7c3aed).
+README_VERSION="$(git show "${REF}:README.md" | sed -nE 's/.*badge\/EveryAlt-(.+)-[0-9a-fA-F]{6}\?.*/\1/p' | head -1 | sed 's/--/-/g')"
 
 if [ -z "${VERSION}" ]; then
   echo "Error: could not determine version from everyalt.php" >&2

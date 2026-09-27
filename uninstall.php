@@ -28,6 +28,13 @@ function every_alt_uninstall_site() {
 		'every_alt_gemini_key',
 		'every_alt_deepinfra_key',
 		'every_alt_model',
+		'every_alt_fill_content_alt',
+		'every_alt_language',
+		'every_alt_detect_decorative',
+		'every_alt_upload_mode',
+		'every_alt_usage',
+		'every_alt_monthly_budget',
+		'every_alt_queue_lock',
 		'every_alt_auto',
 		'every_alt_auto_title',
 		'every_alt_vision_prompt',
@@ -46,6 +53,12 @@ function every_alt_uninstall_site() {
 	foreach ( $options as $option ) {
 		delete_option( $option );
 	}
+
+	// Queue jobs and decorative flags. Alt text and titles themselves are kept.
+	foreach ( array( '_everyalt_queue_alt', '_everyalt_queue_alt_attempts', '_everyalt_queue_title', '_everyalt_queue_title_attempts', '_everyalt_decorative' ) as $meta_key ) {
+		delete_post_meta_by_key( $meta_key );
+	}
+	wp_clear_scheduled_hook( 'everyalt_process_queue' );
 
 	$wpdb->query( "DROP TABLE IF EXISTS {$wpdb->prefix}every_alt_logs" ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 }
