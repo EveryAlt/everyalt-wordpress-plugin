@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/EveryAlt-1.0.2-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.0.2" />
+  <img src="https://img.shields.io/badge/EveryAlt-1.1.0-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.1.0" />
   <img src="https://img.shields.io/badge/WordPress-5.5%2B-21759b?style=flat-square&logo=wordpress" alt="WordPress" />
   <img src="https://img.shields.io/badge/PHP-7.0%2B-777BB4?style=flat-square&logo=php" alt="PHP" />
   <img src="https://img.shields.io/badge/license-GPLv2-green?style=flat-square" alt="License" />
@@ -149,7 +149,7 @@ The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages
 
 ## 📝 Changelog
 
-### Unreleased
+### 1.1.0
 - **Accessibility (WCAG 2.1 AA).** A full review of every screen, with all failures fixed:
   - Review tabs: alt text and title fields now have labels; Save, Regenerate, and Edit identify which image they act on.
   - Results (key validation, queue progress, saves, the Media screen button) are announced to screen readers via WordPress's `wp.a11y.speak`, once per batch rather than once per image.
