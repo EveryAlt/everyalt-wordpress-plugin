@@ -231,8 +231,13 @@ class Every_Alt_Admin {
 				break;
 			}
 		}
-		// gpt-5-nano is being retired; installs from before model selection move to GPT-5.4 nano.
+		// Installs from before model selection start on the default model.
 		add_option( Every_Alt_Providers::MODEL_OPTION, Every_Alt_Providers::DEFAULT_MODEL );
+		// A saved model that has since been retired (e.g. GPT-5.4 nano) moves to the default. Other
+		// choices, such as Gemini or DeepInfra, are left alone.
+		if ( array_key_exists( get_option( Every_Alt_Providers::MODEL_OPTION ), Every_Alt_Providers::retired_models() ) ) {
+			update_option( Every_Alt_Providers::MODEL_OPTION, Every_Alt_Providers::DEFAULT_MODEL );
+		}
 		update_option( 'every_alt_version', $this->version );
 	}
 
@@ -320,7 +325,7 @@ class Every_Alt_Admin {
 	}
 
 	/**
-	 * Display name of the selected model, e.g. "GPT-5.4 nano (OpenAI)".
+	 * Display name of the selected model, e.g. "GPT-6 Luna (OpenAI)".
 	 *
 	 * @return string
 	 */

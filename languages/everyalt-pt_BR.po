@@ -3,9 +3,9 @@
 # This file is distributed under the same license as the EveryAlt package.
 msgid ""
 msgstr ""
-"Project-Id-Version: EveryAlt 1.1.0\n"
+"Project-Id-Version: EveryAlt 1.1.1\n"
 "Report-Msgid-Bugs-To: https://hdc.net\n"
-"POT-Creation-Date: 2026-09-27 16:47+0000\n"
+"POT-Creation-Date: 2026-10-02 23:47+0000\n"
 "PO-Revision-Date: 2026-09-27 00:00+0000\n"
 "Last-Translator: HDC <info@hdc.net>\n"
 "Language-Team: Português do Brasil <info@hdc.net>\n"
@@ -24,7 +24,7 @@ msgid "Skipped: monthly spending limit of %s reached. Generation resumes next mo
 msgstr "Ignorado: limite de gastos mensal de %s atingido. A geração será retomada no próximo mês, ou aumente o limite em Configurações."
 
 #: admin/class-everyalt-admin.php:164
-#: admin/partials/everyalt-options-display.php:548
+#: admin/partials/everyalt-options-display.php:556
 msgid "Time"
 msgstr "Horário"
 
@@ -33,17 +33,17 @@ msgid "Attachment ID"
 msgstr "ID do anexo"
 
 #: admin/class-everyalt-admin.php:166
-#: admin/partials/everyalt-options-display.php:550
+#: admin/partials/everyalt-options-display.php:558
 msgid "Status"
 msgstr "Status"
 
 #: admin/class-everyalt-admin.php:167
-#: admin/partials/everyalt-options-display.php:551
+#: admin/partials/everyalt-options-display.php:559
 msgid "Model"
 msgstr "Modelo"
 
 #: admin/class-everyalt-admin.php:168
-#: admin/partials/everyalt-options-display.php:552
+#: admin/partials/everyalt-options-display.php:560
 msgid "Message / Alt text"
 msgstr "Mensagem / Texto alternativo"
 
@@ -52,226 +52,226 @@ msgid "Cost (USD)"
 msgstr "Custo (USD)"
 
 #: admin/class-everyalt-admin.php:170
-#: admin/partials/everyalt-options-display.php:554
-#: admin/partials/everyalt-options-display.php:598
+#: admin/partials/everyalt-options-display.php:562
+#: admin/partials/everyalt-options-display.php:606
 msgid "Details"
 msgstr "Detalhes"
 
-#: admin/class-everyalt-admin.php:174 admin/class-everyalt-admin.php:434
-#: admin/partials/everyalt-options-display.php:590
+#: admin/class-everyalt-admin.php:174 admin/class-everyalt-admin.php:439
+#: admin/partials/everyalt-options-display.php:598
 msgid "Error"
 msgstr "Erro"
 
 #: admin/class-everyalt-admin.php:174
-#: admin/partials/everyalt-options-display.php:588
+#: admin/partials/everyalt-options-display.php:596
 msgid "Success"
 msgstr "Sucesso"
 
 #. translators: 1: provider name(s), e.g. "OpenAI", 2: URL of the EveryAlt settings tab
-#: admin/class-everyalt-admin.php:259
+#: admin/class-everyalt-admin.php:264
 #, php-format
 msgid "EveryAlt can no longer read your saved %1$s API key, usually because the security keys in wp-config.php changed. Generation with that provider is paused until you <a href=\"%2$s\">re-enter the key</a>."
 msgstr "O EveryAlt não consegue mais ler a chave de API de %1$s que você salvou, geralmente porque as chaves de segurança no wp-config.php foram alteradas. A geração com esse provedor está pausada até você <a href=\"%2$s\">digitar a chave novamente</a>."
 
 #. translators: 1: spent this month, 2: monthly limit, 3: settings URL
-#: admin/class-everyalt-admin.php:278
+#: admin/class-everyalt-admin.php:283
 #, php-format
 msgid "EveryAlt has paused: this month’s estimated spend (%1$s) reached your monthly limit of %2$s. New images will be processed next month, or you can <a href=\"%3$s\">raise the limit</a>."
 msgstr "O EveryAlt foi pausado: o gasto estimado deste mês (%1$s) atingiu seu limite mensal de %2$s. Novas imagens serão processadas no próximo mês, ou você pode <a href=\"%3$s\">aumentar o limite</a>."
 
-#: admin/class-everyalt-admin.php:293
+#: admin/class-everyalt-admin.php:298
 msgid "You do not have permission to do this."
 msgstr "Você não tem permissão para fazer isso."
 
-#: admin/class-everyalt-admin.php:297
+#: admin/class-everyalt-admin.php:302
 msgid "Unknown provider."
 msgstr "Provedor desconhecido."
 
-#: admin/class-everyalt-admin.php:304
+#: admin/class-everyalt-admin.php:309
 msgid "Enter an API key in the field above, or save a key first to validate the stored key."
 msgstr "Digite uma chave de API no campo acima ou salve uma chave primeiro para validar a chave armazenada."
 
-#: admin/class-everyalt-admin.php:307
+#: admin/class-everyalt-admin.php:312
 msgid "API key is valid."
 msgstr "A chave de API é válida."
 
-#: admin/class-everyalt-admin.php:309
+#: admin/class-everyalt-admin.php:314
 msgid "API key could not be validated. Check that the key is correct and has API access."
 msgstr "A chave de API não pôde ser validada. Verifique se a chave está correta e tem acesso à API."
 
-#: admin/class-everyalt-admin.php:423
+#: admin/class-everyalt-admin.php:428
 #, php-format
 msgid "Generating in the background: %d remaining. You can leave this page; it continues on its own."
 msgstr "Gerando em segundo plano: %d restantes. Você pode sair desta página; o processo continua sozinho."
 
-#: admin/class-everyalt-admin.php:424
+#: admin/class-everyalt-admin.php:429
 #, php-format
 msgid "%d waiting to retry. They will be tried again automatically."
 msgstr "%d aguardando nova tentativa, que será feita automaticamente."
 
-#: admin/class-everyalt-admin.php:425
+#: admin/class-everyalt-admin.php:430
 msgid "All done."
 msgstr "Tudo pronto."
 
-#: admin/class-everyalt-admin.php:426
+#: admin/class-everyalt-admin.php:431
 msgid "Paused: monthly spending limit reached. Raise the limit in Settings or wait until next month."
 msgstr "Pausado: limite de gastos mensal atingido. Aumente o limite em Configurações ou aguarde até o próximo mês."
 
-#: admin/class-everyalt-admin.php:427
+#: admin/class-everyalt-admin.php:432
 msgid "Paused: add an API key for the selected model in Settings."
 msgstr "Pausado: adicione uma chave de API para o modelo selecionado em Configurações."
 
-#: admin/class-everyalt-admin.php:428
+#: admin/class-everyalt-admin.php:433
 #, php-format
 msgid "Added %d images to the queue."
 msgstr "%d imagens adicionadas à fila."
 
-#: admin/class-everyalt-admin.php:429
+#: admin/class-everyalt-admin.php:434
 msgid "Those images were already queued."
 msgstr "Essas imagens já estavam na fila."
 
-#: admin/class-everyalt-admin.php:430
+#: admin/class-everyalt-admin.php:435
 msgid "Queue cleared."
 msgstr "Fila limpa."
 
-#: admin/class-everyalt-admin.php:431
+#: admin/class-everyalt-admin.php:436
 msgid "Marked as decorative (alt text left empty on purpose)"
 msgstr "Marcada como decorativa (texto alternativo deixado vazio de propósito)"
 
 #. translators: %d: number of images finished in this batch
-#: admin/class-everyalt-admin.php:433
+#: admin/class-everyalt-admin.php:438
 #, php-format
 msgid "%d finished."
 msgstr "%d concluídas."
 
-#: admin/class-everyalt-admin.php:435 admin/class-everyalt-admin.php:460
+#: admin/class-everyalt-admin.php:440 admin/class-everyalt-admin.php:465
 msgid "Error:"
 msgstr "Erro:"
 
-#: admin/class-everyalt-admin.php:436
+#: admin/class-everyalt-admin.php:441
 msgid "Request failed"
 msgstr "A solicitação falhou"
 
-#: admin/class-everyalt-admin.php:437
+#: admin/class-everyalt-admin.php:442
 msgid "Saved!"
 msgstr "Salvo!"
 
-#: admin/class-everyalt-admin.php:438
+#: admin/class-everyalt-admin.php:443
 msgid "Save failed"
 msgstr "Falha ao salvar"
 
-#: admin/class-everyalt-admin.php:439
+#: admin/class-everyalt-admin.php:444
 msgid "Regenerated!"
 msgstr "Regenerado!"
 
-#: admin/class-everyalt-admin.php:440
+#: admin/class-everyalt-admin.php:445
 msgid "Regenerate failed"
 msgstr "Falha ao regenerar"
 
-#: admin/class-everyalt-admin.php:453 admin/class-everyalt-admin.php:1054
-#: admin/class-everyalt-admin.php:1055
+#: admin/class-everyalt-admin.php:458 admin/class-everyalt-admin.php:1059
+#: admin/class-everyalt-admin.php:1060
 #: admin/partials/everyalt-options-display.php:13
 msgid "EveryAlt"
 msgstr "EveryAlt"
 
-#: admin/class-everyalt-admin.php:454
+#: admin/class-everyalt-admin.php:459
 msgid "Generate alt text with EveryAlt"
 msgstr "Gerar texto alternativo com EveryAlt"
 
-#: admin/class-everyalt-admin.php:455
+#: admin/class-everyalt-admin.php:460
 msgid "Select or upload an image to generate alt text."
 msgstr "Selecione ou envie uma imagem para gerar o texto alternativo."
 
-#: admin/class-everyalt-admin.php:456
+#: admin/class-everyalt-admin.php:461
 msgid "Generating…"
 msgstr "Gerando…"
 
-#: admin/class-everyalt-admin.php:457
+#: admin/class-everyalt-admin.php:462
 msgid "Alt text generated."
 msgstr "Texto alternativo gerado."
 
-#: admin/class-everyalt-admin.php:458
+#: admin/class-everyalt-admin.php:463
 msgid "Could not generate alt text."
 msgstr "Não foi possível gerar o texto alternativo."
 
-#: admin/class-everyalt-admin.php:459
+#: admin/class-everyalt-admin.php:464
 msgid "Marked as decorative: alt text left empty on purpose."
 msgstr "Marcada como decorativa: texto alternativo deixado vazio de propósito."
 
-#: admin/class-everyalt-admin.php:580
+#: admin/class-everyalt-admin.php:585
 msgid "Skipped: no API key or auto-generate disabled."
 msgstr "Ignorado: nenhuma chave de API ou geração automática desativada."
 
-#: admin/class-everyalt-admin.php:585
+#: admin/class-everyalt-admin.php:590
 msgid "Skipped: API key validation failed."
 msgstr "Ignorado: a validação da chave de API falhou."
 
-#: admin/class-everyalt-admin.php:595
+#: admin/class-everyalt-admin.php:600
 msgid "Skipped: not a valid image or file exceeds 4MB."
 msgstr "Ignorado: imagem inválida ou arquivo maior que 4 MB."
 
-#: admin/class-everyalt-admin.php:618
+#: admin/class-everyalt-admin.php:623
 msgid "Marked as decorative (alt text left empty on purpose)."
 msgstr "Marcada como decorativa (texto alternativo deixado vazio de propósito)."
 
-#: admin/class-everyalt-admin.php:625
+#: admin/class-everyalt-admin.php:630
 msgid "No alt text returned from API."
 msgstr "A API não retornou texto alternativo."
 
-#: admin/class-everyalt-admin.php:651
+#: admin/class-everyalt-admin.php:656
 msgid "[Title] Skipped: no API key or auto-generate disabled."
 msgstr "[Título] Ignorado: nenhuma chave de API ou geração automática desativada."
 
-#: admin/class-everyalt-admin.php:656
+#: admin/class-everyalt-admin.php:661
 msgid "[Title] Skipped: API key validation failed."
 msgstr "[Título] Ignorado: a validação da chave de API falhou."
 
-#: admin/class-everyalt-admin.php:666
+#: admin/class-everyalt-admin.php:671
 msgid "[Title] Skipped: not a valid image or file exceeds 4MB."
 msgstr "[Título] Ignorado: imagem inválida ou arquivo maior que 4 MB."
 
-#: admin/class-everyalt-admin.php:689
+#: admin/class-everyalt-admin.php:694
 msgid "[Title] No title returned from API."
 msgstr "[Título] A API não retornou título."
 
-#: admin/class-everyalt-admin.php:1035 admin/class-everyalt-admin.php:1077
+#: admin/class-everyalt-admin.php:1040 admin/class-everyalt-admin.php:1082
 #: admin/partials/everyalt-options-display.php:63
 msgid "Settings"
 msgstr "Configurações"
 
-#: admin/class-everyalt-admin.php:1078
-#: admin/partials/everyalt-options-display.php:295
+#: admin/class-everyalt-admin.php:1083
+#: admin/partials/everyalt-options-display.php:303
 msgid "Bulk Alt Text Generator"
 msgstr "Gerador em massa de texto alternativo"
 
-#: admin/class-everyalt-admin.php:1079
-#: admin/partials/everyalt-options-display.php:343
+#: admin/class-everyalt-admin.php:1084
+#: admin/partials/everyalt-options-display.php:351
 msgid "Review Alt Text"
 msgstr "Revisar texto alternativo"
 
-#: admin/class-everyalt-admin.php:1080
-#: admin/partials/everyalt-options-display.php:391
+#: admin/class-everyalt-admin.php:1085
+#: admin/partials/everyalt-options-display.php:399
 msgid "Bulk Image Title Generator"
 msgstr "Gerador em massa de títulos de imagem"
 
-#: admin/class-everyalt-admin.php:1081
-#: admin/partials/everyalt-options-display.php:439
+#: admin/class-everyalt-admin.php:1086
+#: admin/partials/everyalt-options-display.php:447
 msgid "Review Image Titles"
 msgstr "Revisar títulos de imagem"
 
-#: admin/class-everyalt-admin.php:1082
+#: admin/class-everyalt-admin.php:1087
 msgid "Logs"
 msgstr "Registros"
 
-#: admin/class-everyalt-admin.php:1396 admin/class-everyalt-admin.php:1421
+#: admin/class-everyalt-admin.php:1401 admin/class-everyalt-admin.php:1426
 msgid "Generation failed."
 msgstr "A geração falhou."
 
-#: admin/class-everyalt-admin.php:1494
+#: admin/class-everyalt-admin.php:1499
 msgid "Alt successfully updated."
 msgstr "Texto alternativo atualizado com sucesso."
 
-#: admin/class-everyalt-admin.php:1510
+#: admin/class-everyalt-admin.php:1515
 msgid "Title successfully updated."
 msgstr "Título atualizado com sucesso."
 
@@ -322,276 +322,278 @@ msgstr "Modelo de IA"
 msgid "$%1$s input · $%2$s output per 1M tokens"
 msgstr "$%1$s de entrada · $%2$s de saída por 1M de tokens"
 
-#: admin/partials/everyalt-options-display.php:103
-msgid "All models read the image and write alt text and titles the same way. Prices are each provider’s published rates as of September 2026 and may change. You pay the provider directly; EveryAlt never bills you. The actual cost of each image is recorded on the Logs tab."
-msgstr "Todos os modelos analisam a imagem e escrevem textos alternativos e títulos da mesma forma. Os preços são as tarifas publicadas por cada provedor em setembro de 2026 e podem mudar. Você paga diretamente ao provedor; o EveryAlt nunca cobra nada de você. O custo real de cada imagem fica registrado na aba Registros."
+#. translators: %s: month and year the prices were checked, e.g. October 2026
+#: admin/partials/everyalt-options-display.php:107
+#, php-format
+msgid "All models read the image and write alt text and titles the same way. Prices are each provider’s published rates as of %s and may change. You pay the provider directly; EveryAlt never bills you. The actual cost of each image is recorded on the Logs tab."
+msgstr "Todos os modelos analisam a imagem e escrevem textos alternativos e títulos da mesma forma. Os preços são as tarifas publicadas por cada provedor em %s e podem mudar. Você paga diretamente ao provedor; o EveryAlt nunca cobra nada de você. O custo real de cada imagem fica registrado na aba Registros."
 
 #. translators: %s: provider name, e.g. OpenAI
-#: admin/partials/everyalt-options-display.php:110
+#: admin/partials/everyalt-options-display.php:118
 #, php-format
 msgid "%s pricing"
 msgstr "Preços de %s"
 
-#: admin/partials/everyalt-options-display.php:118
+#: admin/partials/everyalt-options-display.php:126
 msgid "API key"
 msgstr "Chave de API"
 
 #. translators: %s: provider name, e.g. OpenAI
-#: admin/partials/everyalt-options-display.php:129
+#: admin/partials/everyalt-options-display.php:137
 #, php-format
 msgid "%s API key"
 msgstr "Chave de API de %s"
 
-#: admin/partials/everyalt-options-display.php:133
+#: admin/partials/everyalt-options-display.php:141
 msgid "Key saved"
 msgstr "Chave salva"
 
-#: admin/partials/everyalt-options-display.php:133
+#: admin/partials/everyalt-options-display.php:141
 msgid "No key saved"
 msgstr "Nenhuma chave salva"
 
-#: admin/partials/everyalt-options-display.php:137
+#: admin/partials/everyalt-options-display.php:145
 msgid "Leave blank to keep existing key"
 msgstr "Deixe em branco para manter a chave atual"
 
-#: admin/partials/everyalt-options-display.php:137
+#: admin/partials/everyalt-options-display.php:145
 msgid "Paste your API key"
 msgstr "Cole sua chave de API"
 
-#: admin/partials/everyalt-options-display.php:138
+#: admin/partials/everyalt-options-display.php:146
 msgid "Validate key"
 msgstr "Validar chave"
 
 #. translators: %s: link to OpenAI API keys page
-#: admin/partials/everyalt-options-display.php:144
+#: admin/partials/everyalt-options-display.php:152
 #, php-format
 msgid "Sign in at %s."
 msgstr "Faça login em %s."
 
-#: admin/partials/everyalt-options-display.php:145
+#: admin/partials/everyalt-options-display.php:153
 msgid "Click “Create new secret key”, give it a name (e.g. “EveryAlt”), and copy the key. It is only shown once."
 msgstr "Clique em “Create new secret key”, dê um nome a ela (por exemplo, “EveryAlt”) e copie a chave. Ela é exibida apenas uma vez."
 
-#: admin/partials/everyalt-options-display.php:146
+#: admin/partials/everyalt-options-display.php:154
 msgid "Add a payment method or prepaid credits in your OpenAI billing settings; generation fails until your account has credit."
 msgstr "Adicione uma forma de pagamento ou créditos pré-pagos nas configurações de faturamento da OpenAI; a geração falhará até que sua conta tenha crédito."
 
-#: admin/partials/everyalt-options-display.php:148
+#: admin/partials/everyalt-options-display.php:156
 msgid "OpenAI API data usage"
 msgstr "Uso de dados da API da OpenAI"
 
 #. translators: %s: link to OpenAI data usage policy
-#: admin/partials/everyalt-options-display.php:148
+#: admin/partials/everyalt-options-display.php:156
 #, php-format
 msgid "OpenAI does not use API data to train its models by default. See %s."
 msgstr "Por padrão, a OpenAI não usa dados da API para treinar seus modelos. Consulte %s."
 
 #. translators: %s: link to Google AI Studio API keys page
-#: admin/partials/everyalt-options-display.php:151
+#: admin/partials/everyalt-options-display.php:159
 #, php-format
 msgid "Sign in to Google AI Studio at %s."
 msgstr "Faça login no Google AI Studio em %s."
 
-#: admin/partials/everyalt-options-display.php:152
+#: admin/partials/everyalt-options-display.php:160
 msgid "Click “Create API key”, choose or create a Google Cloud project, and copy the key."
 msgstr "Clique em “Create API key”, escolha ou crie um projeto do Google Cloud e copie a chave."
 
-#: admin/partials/everyalt-options-display.php:153
+#: admin/partials/everyalt-options-display.php:161
 msgid "Optional: set up billing on the project to move from the free tier to the paid tier."
 msgstr "Opcional: configure o faturamento no projeto para passar do nível gratuito para o nível pago."
 
-#: admin/partials/everyalt-options-display.php:155
+#: admin/partials/everyalt-options-display.php:163
 msgid "Gemini API terms"
 msgstr "Termos da API do Gemini"
 
 #. translators: %s: link to Gemini API terms
-#: admin/partials/everyalt-options-display.php:155
+#: admin/partials/everyalt-options-display.php:163
 #, php-format
 msgid "Gemini has a free tier, but Google may use free-tier prompts and images to improve its products. On the paid tier (billing enabled), your content is not used that way. See the %s."
 msgstr "O Gemini tem um nível gratuito, mas o Google pode usar prompts e imagens do nível gratuito para melhorar seus produtos. No nível pago (com faturamento ativado), seu conteúdo não é usado dessa forma. Consulte os %s."
 
 #. translators: %s: link to DeepInfra API keys page
-#: admin/partials/everyalt-options-display.php:158
+#: admin/partials/everyalt-options-display.php:166
 #, php-format
 msgid "Sign in or create an account at %s."
 msgstr "Faça login ou crie uma conta em %s."
 
-#: admin/partials/everyalt-options-display.php:159
+#: admin/partials/everyalt-options-display.php:167
 msgid "Click “New API key”, name it (e.g. “EveryAlt”), and copy the key."
 msgstr "Clique em “New API key”, dê um nome a ela (por exemplo, “EveryAlt”) e copie a chave."
 
-#: admin/partials/everyalt-options-display.php:160
+#: admin/partials/everyalt-options-display.php:168
 msgid "Add a payment method or credits in your DeepInfra billing settings. One DeepInfra key works for both DeepSeek V4.1 Flash and GLM-5.3-Flash."
 msgstr "Adicione uma forma de pagamento ou créditos nas configurações de faturamento da DeepInfra. Uma única chave da DeepInfra funciona tanto para o DeepSeek V4.1 Flash quanto para o GLM-5.3-Flash."
 
-#: admin/partials/everyalt-options-display.php:164
+#: admin/partials/everyalt-options-display.php:172
 msgid "Your images stay private."
 msgstr "Suas imagens permanecem privadas."
 
-#: admin/partials/everyalt-options-display.php:165
+#: admin/partials/everyalt-options-display.php:173
 msgid "DeepInfra runs these models on its own infrastructure in data centers in the US and Canada, with a zero data retention policy: your images and the generated text are processed in memory and not stored, the content of requests is not logged, and your data is never used to train models."
 msgstr "A DeepInfra executa esses modelos em sua própria infraestrutura, em data centers nos EUA e no Canadá, com uma política de retenção zero de dados: suas imagens e o texto gerado são processados em memória e não são armazenados, o conteúdo das solicitações não é registrado e seus dados nunca são usados para treinar modelos."
 
-#: admin/partials/everyalt-options-display.php:170
+#: admin/partials/everyalt-options-display.php:178
 msgid "DeepInfra data privacy"
 msgstr "Privacidade de dados da DeepInfra"
 
-#: admin/partials/everyalt-options-display.php:171
+#: admin/partials/everyalt-options-display.php:179
 msgid "Privacy policy"
 msgstr "Política de privacidade"
 
-#: admin/partials/everyalt-options-display.php:172
+#: admin/partials/everyalt-options-display.php:180
 msgid "Trust center (SOC 2, ISO 27001)"
 msgstr "Central de confiança (SOC 2, ISO 27001)"
 
-#: admin/partials/everyalt-options-display.php:181
+#: admin/partials/everyalt-options-display.php:189
 msgid "Keys are stored encrypted in your WordPress database. The image is sent to the provider as base64, so generation works on localhost and behind HTTP auth."
 msgstr "As chaves são armazenadas criptografadas no banco de dados do seu WordPress. A imagem é enviada ao provedor em base64, então a geração funciona em localhost e atrás de autenticação HTTP."
 
-#: admin/partials/everyalt-options-display.php:185
+#: admin/partials/everyalt-options-display.php:193
 msgid "Auto-generate on upload"
 msgstr "Gerar automaticamente no envio"
 
-#: admin/partials/everyalt-options-display.php:187
+#: admin/partials/everyalt-options-display.php:195
 msgid "Automatically generate alt text when images are uploaded"
 msgstr "Gerar automaticamente o texto alternativo quando as imagens forem enviadas"
 
-#: admin/partials/everyalt-options-display.php:189
+#: admin/partials/everyalt-options-display.php:197
 msgid "Automatically generate image titles when images are uploaded"
 msgstr "Gerar automaticamente os títulos de imagem quando as imagens forem enviadas"
 
-#: admin/partials/everyalt-options-display.php:193
-#: admin/partials/everyalt-options-display.php:196
+#: admin/partials/everyalt-options-display.php:201
+#: admin/partials/everyalt-options-display.php:204
 msgid "New uploads"
 msgstr "Novos envios"
 
-#: admin/partials/everyalt-options-display.php:197
+#: admin/partials/everyalt-options-display.php:205
 msgid "Generate in the background (recommended): uploads finish right away"
 msgstr "Gerar em segundo plano (recomendado): os envios terminam imediatamente"
 
-#: admin/partials/everyalt-options-display.php:198
+#: admin/partials/everyalt-options-display.php:206
 msgid "Generate during the upload: alt text is ready when the upload finishes, but each upload waits for the AI"
 msgstr "Gerar durante o envio: o texto alternativo fica pronto quando o envio termina, mas cada envio aguarda a IA"
 
-#: admin/partials/everyalt-options-display.php:200
+#: admin/partials/everyalt-options-display.php:208
 msgid "Background jobs usually finish within a minute. They run on WordPress’s scheduler (WP-Cron), and also whenever an EveryAlt page is open, so they still work on sites where WP-Cron is blocked, such as sites behind a password."
 msgstr "As tarefas em segundo plano geralmente terminam em até um minuto. Elas são executadas pelo agendador do WordPress (WP-Cron) e também sempre que uma página do EveryAlt está aberta, então funcionam mesmo em sites onde o WP-Cron está bloqueado, como sites protegidos por senha."
 
-#: admin/partials/everyalt-options-display.php:204
+#: admin/partials/everyalt-options-display.php:212
 msgid "Decorative images"
 msgstr "Imagens decorativas"
 
-#: admin/partials/everyalt-options-display.php:206
+#: admin/partials/everyalt-options-display.php:214
 msgid "Leave alt text empty for purely decorative images"
 msgstr "Deixar o texto alternativo vazio em imagens puramente decorativas"
 
-#: admin/partials/everyalt-options-display.php:207
+#: admin/partials/everyalt-options-display.php:215
 msgid "Accessibility guidelines (WCAG) say decorative images such as dividers, spacers, and background patterns should have empty alt text so screen readers skip them. When the AI judges an image clearly decorative, EveryAlt leaves its alt text empty and marks it on the Review Alt Text tab, where you can ask for a description instead. When in doubt, the AI describes the image."
 msgstr "As diretrizes de acessibilidade (WCAG) indicam que imagens decorativas, como divisores, espaçadores e padrões de fundo, devem ter texto alternativo vazio para que os leitores de tela as ignorem. Quando a IA considera uma imagem claramente decorativa, o EveryAlt deixa o texto alternativo vazio e a marca na aba Revisar texto alternativo, onde você pode pedir uma descrição. Na dúvida, a IA descreve a imagem."
 
-#: admin/partials/everyalt-options-display.php:211
+#: admin/partials/everyalt-options-display.php:219
 msgid "Monthly spending limit"
 msgstr "Limite de gastos mensal"
 
-#: admin/partials/everyalt-options-display.php:214
+#: admin/partials/everyalt-options-display.php:222
 msgid "None"
 msgstr "Nenhum"
 
-#: admin/partials/everyalt-options-display.php:215
+#: admin/partials/everyalt-options-display.php:223
 msgid "USD per month"
 msgstr "USD por mês"
 
 #. translators: %s: estimated amount spent this month, e.g. $0.42
-#: admin/partials/everyalt-options-display.php:221
+#: admin/partials/everyalt-options-display.php:229
 #, php-format
 msgid "Estimated spend this month: %s. When the limit is reached, generation pauses until next month (queued images wait). Leave empty for no limit. Estimates use each provider’s published prices; your provider’s invoice is authoritative."
 msgstr "Gasto estimado neste mês: %s. Quando o limite é atingido, a geração é pausada até o próximo mês (as imagens na fila aguardam). Deixe vazio para não ter limite. As estimativas usam os preços publicados por cada provedor; a fatura do seu provedor é o valor oficial."
 
-#: admin/partials/everyalt-options-display.php:230
+#: admin/partials/everyalt-options-display.php:238
 msgid "Existing posts"
 msgstr "Posts existentes"
 
-#: admin/partials/everyalt-options-display.php:232
+#: admin/partials/everyalt-options-display.php:240
 msgid "Show Media Library alt text on images already in posts that have none"
 msgstr "Mostrar o texto alternativo da Biblioteca de mídia em imagens já inseridas em posts que não têm nenhum"
 
-#: admin/partials/everyalt-options-display.php:233
+#: admin/partials/everyalt-options-display.php:241
 msgid "When an image is added to a post, WordPress copies its alt text into the post at that moment, so alt text generated later doesn’t appear in older posts. With this on, empty alt text in posts is filled in from the Media Library when the page is displayed. Your posts are not modified, and alt text written in a post is never replaced. Requires WordPress 6.0 or later."
 msgstr "Quando uma imagem é adicionada a um post, o WordPress copia o texto alternativo dela para o post naquele momento, então textos alternativos gerados depois não aparecem em posts mais antigos. Com esta opção ativada, textos alternativos vazios nos posts são preenchidos a partir da Biblioteca de mídia quando a página é exibida. Seus posts não são modificados, e o texto alternativo escrito em um post nunca é substituído. Requer WordPress 6.0 ou posterior."
 
-#: admin/partials/everyalt-options-display.php:237
+#: admin/partials/everyalt-options-display.php:245
 msgid "Language"
 msgstr "Idioma"
 
 #. translators: %s: site language name in English, e.g. German
-#: admin/partials/everyalt-options-display.php:244
+#: admin/partials/everyalt-options-display.php:252
 #, php-format
 msgid "Automatic (site language: %s)"
 msgstr "Automático (idioma do site: %s)"
 
-#: admin/partials/everyalt-options-display.php:251
+#: admin/partials/everyalt-options-display.php:259
 msgid "Language for generated alt text and titles. Automatic uses your site language, or each image’s own language on multilingual sites using Polylang or WPML."
 msgstr "Idioma dos textos alternativos e títulos gerados. Automático usa o idioma do seu site ou, em sites multilíngues com Polylang ou WPML, o idioma de cada imagem."
 
-#: admin/partials/everyalt-options-display.php:255
+#: admin/partials/everyalt-options-display.php:263
 msgid "Max completion tokens"
 msgstr "Tokens máximos de conclusão"
 
-#: admin/partials/everyalt-options-display.php:258
+#: admin/partials/everyalt-options-display.php:266
 msgid "Maximum tokens the model can use for its response, including any reasoning. Default 1024. Leave empty to use default."
 msgstr "Número máximo de tokens que o modelo pode usar na resposta, incluindo qualquer raciocínio. Padrão: 1024. Deixe vazio para usar o padrão."
 
-#: admin/partials/everyalt-options-display.php:262
+#: admin/partials/everyalt-options-display.php:270
 msgid "Alt text prompt"
 msgstr "Prompt do texto alternativo"
 
-#: admin/partials/everyalt-options-display.php:270
+#: admin/partials/everyalt-options-display.php:278
 msgid "Instruction sent to the AI with each image. Edit as needed. The model should return only the alt text, no extra wording."
 msgstr "Instrução enviada à IA com cada imagem. Edite conforme necessário. O modelo deve retornar apenas o texto alternativo, sem texto extra."
 
-#: admin/partials/everyalt-options-display.php:274
+#: admin/partials/everyalt-options-display.php:282
 msgid "Image title prompt"
 msgstr "Prompt do título da imagem"
 
-#: admin/partials/everyalt-options-display.php:282
+#: admin/partials/everyalt-options-display.php:290
 msgid "Instruction sent to the AI when generating image titles. Titles are usually short (a few words). The model should return only the title, no extra wording."
 msgstr "Instrução enviada à IA ao gerar títulos de imagem. Os títulos costumam ser curtos (poucas palavras). O modelo deve retornar apenas o título, sem texto extra."
 
-#: admin/partials/everyalt-options-display.php:287
+#: admin/partials/everyalt-options-display.php:295
 msgid "Save Settings"
 msgstr "Salvar configurações"
 
-#: admin/partials/everyalt-options-display.php:296
+#: admin/partials/everyalt-options-display.php:304
 #, php-format
 msgid "This page finds all images in your media library that do not currently have alt text and lets you generate new alt text with EveryAlt quickly. To see existing images that already have alt text, go to the <a href=\"%s\">Review Alt Text</a> tab."
 msgstr "Esta página encontra todas as imagens da sua biblioteca de mídia que ainda não têm texto alternativo e permite gerar um com EveryAlt rapidamente. Para ver imagens que já têm texto alternativo, vá à aba <a href=\"%s\">Revisar texto alternativo</a>."
 
-#: admin/partials/everyalt-options-display.php:298
-#: admin/partials/everyalt-options-display.php:394
+#: admin/partials/everyalt-options-display.php:306
+#: admin/partials/everyalt-options-display.php:402
 msgid "Please add an API key for the selected AI model in the Settings tab first."
 msgstr "Primeiro, adicione uma chave de API para o modelo de IA selecionado na aba Configurações."
 
-#: admin/partials/everyalt-options-display.php:300
+#: admin/partials/everyalt-options-display.php:308
 msgid "No images without alt text found."
 msgstr "Nenhuma imagem sem texto alternativo encontrada."
 
-#: admin/partials/everyalt-options-display.php:303
-#: admin/partials/everyalt-options-display.php:399
+#: admin/partials/everyalt-options-display.php:311
+#: admin/partials/everyalt-options-display.php:407
 msgid "Select all"
 msgstr "Selecionar tudo"
 
-#: admin/partials/everyalt-options-display.php:304
-#: admin/partials/everyalt-options-display.php:400
+#: admin/partials/everyalt-options-display.php:312
+#: admin/partials/everyalt-options-display.php:408
 msgid "Select none"
 msgstr "Desmarcar todas"
 
-#: admin/partials/everyalt-options-display.php:305
+#: admin/partials/everyalt-options-display.php:313
 msgid "Generate alt text for selected"
 msgstr "Gerar texto alternativo para os selecionados"
 
 #. translators: %s: number of images
-#: admin/partials/everyalt-options-display.php:309
-#: admin/partials/everyalt-options-display.php:405
+#: admin/partials/everyalt-options-display.php:317
+#: admin/partials/everyalt-options-display.php:413
 #, php-format
 msgid "Generate for all %s image"
 msgid_plural "Generate for all %s images"
@@ -599,10 +601,10 @@ msgstr[0] "Gerar para %s imagem"
 msgstr[1] "Gerar para todas as %s imagens"
 
 #. translators: %s: number of images
-#: admin/partials/everyalt-options-display.php:313
-#: admin/partials/everyalt-options-display.php:351
-#: admin/partials/everyalt-options-display.php:409
-#: admin/partials/everyalt-options-display.php:447
+#: admin/partials/everyalt-options-display.php:321
+#: admin/partials/everyalt-options-display.php:359
+#: admin/partials/everyalt-options-display.php:417
+#: admin/partials/everyalt-options-display.php:455
 #, php-format
 msgid "%s image"
 msgid_plural "%s images"
@@ -610,160 +612,166 @@ msgstr[0] "%s imagem"
 msgstr[1] "%s imagens"
 
 #. translators: %s: image title
-#: admin/partials/everyalt-options-display.php:321
-#: admin/partials/everyalt-options-display.php:417
+#: admin/partials/everyalt-options-display.php:329
+#: admin/partials/everyalt-options-display.php:425
 #, php-format
 msgid "Select “%s”"
 msgstr "Selecionar “%s”"
 
-#: admin/partials/everyalt-options-display.php:328
-#: admin/partials/everyalt-options-display.php:365
-#: admin/partials/everyalt-options-display.php:424
-#: admin/partials/everyalt-options-display.php:457
+#: admin/partials/everyalt-options-display.php:336
+#: admin/partials/everyalt-options-display.php:373
+#: admin/partials/everyalt-options-display.php:432
+#: admin/partials/everyalt-options-display.php:465
 msgid "Edit"
 msgstr "Editar"
 
-#: admin/partials/everyalt-options-display.php:344
+#: admin/partials/everyalt-options-display.php:352
 msgid "Images that already have alt text, plus images marked decorative (alt text left empty on purpose). Edit and save, or regenerate with EveryAlt."
 msgstr "Imagens que já têm texto alternativo, além das imagens marcadas como decorativas (texto alternativo deixado vazio de propósito). Edite e salve, ou regenere com EveryAlt."
 
-#: admin/partials/everyalt-options-display.php:346
-#: admin/partials/everyalt-options-display.php:442
+#: admin/partials/everyalt-options-display.php:354
+#: admin/partials/everyalt-options-display.php:450
 msgid "Please add an API key for the selected AI model in the Settings tab to use Regenerate."
 msgstr "Adicione uma chave de API para o modelo de IA selecionado na aba Configurações para usar Regenerar."
 
-#: admin/partials/everyalt-options-display.php:349
+#: admin/partials/everyalt-options-display.php:357
 msgid "No images with alt text found."
 msgstr "Nenhuma imagem com texto alternativo encontrada."
 
-#: admin/partials/everyalt-options-display.php:362
+#: admin/partials/everyalt-options-display.php:370
 msgid "Decorative"
 msgstr "Decorativa"
 
 #. translators: %s: image title
-#: admin/partials/everyalt-options-display.php:367
+#: admin/partials/everyalt-options-display.php:375
 #, php-format
 msgid "Alt text for “%s”"
 msgstr "Texto alternativo de “%s”"
 
-#: admin/partials/everyalt-options-display.php:368
+#: admin/partials/everyalt-options-display.php:376
 msgid "Empty on purpose: screen readers skip this image."
 msgstr "Vazio de propósito: os leitores de tela ignoram esta imagem."
 
-#: admin/partials/everyalt-options-display.php:370
-#: admin/partials/everyalt-options-display.php:463
+#: admin/partials/everyalt-options-display.php:378
+#: admin/partials/everyalt-options-display.php:471
 msgid "Save"
 msgstr "Salvar"
 
-#: admin/partials/everyalt-options-display.php:372
+#: admin/partials/everyalt-options-display.php:380
 msgid "Describe anyway"
 msgstr "Descrever mesmo assim"
 
-#: admin/partials/everyalt-options-display.php:374
-#: admin/partials/everyalt-options-display.php:464
+#: admin/partials/everyalt-options-display.php:382
+#: admin/partials/everyalt-options-display.php:472
 msgid "Regenerate"
 msgstr "Regenerar"
 
-#: admin/partials/everyalt-options-display.php:392
+#: admin/partials/everyalt-options-display.php:400
 #, php-format
 msgid "This page finds images whose title is still the raw upload filename (e.g. \"IMG_1234\") and lets you generate descriptive titles with EveryAlt quickly. To see images that already have a custom title, go to the <a href=\"%s\">Review Image Titles</a> tab."
 msgstr "Esta página encontra imagens cujo título ainda é o nome original do arquivo enviado (por exemplo, \"IMG_1234\") e permite gerar títulos descritivos com EveryAlt rapidamente. Para ver imagens que já têm um título personalizado, vá à aba <a href=\"%s\">Revisar títulos de imagem</a>."
 
-#: admin/partials/everyalt-options-display.php:396
+#: admin/partials/everyalt-options-display.php:404
 msgid "No images needing a title found."
 msgstr "Nenhuma imagem precisando de título encontrada."
 
-#: admin/partials/everyalt-options-display.php:401
+#: admin/partials/everyalt-options-display.php:409
 msgid "Generate titles for selected"
 msgstr "Gerar títulos para os selecionados"
 
-#: admin/partials/everyalt-options-display.php:440
+#: admin/partials/everyalt-options-display.php:448
 msgid "Images that already have a custom title. Edit and save, or regenerate with EveryAlt."
 msgstr "Imagens que já têm um título personalizado. Edite e salve, ou regenere com EveryAlt."
 
-#: admin/partials/everyalt-options-display.php:445
+#: admin/partials/everyalt-options-display.php:453
 msgid "No images with a custom title found."
 msgstr "Nenhuma imagem com título personalizado encontrada."
 
 #. translators: %s: image file name
-#: admin/partials/everyalt-options-display.php:460
+#: admin/partials/everyalt-options-display.php:468
 #, php-format
 msgid "Title for image file “%s”"
 msgstr "Título da imagem para o arquivo “%s”"
 
-#: admin/partials/everyalt-options-display.php:480
+#: admin/partials/everyalt-options-display.php:488
 msgid "Spending"
 msgstr "Gastos"
 
 #. translators: 1: spent this month, 2: monthly limit
-#: admin/partials/everyalt-options-display.php:491
+#: admin/partials/everyalt-options-display.php:499
 #, php-format
 msgid "This month: %1$s of your %2$s limit."
 msgstr "Este mês: %1$s do seu limite de %2$s."
 
 #. translators: %s: spent this month
-#: admin/partials/everyalt-options-display.php:494
+#: admin/partials/everyalt-options-display.php:502
 #, php-format
 msgid "This month: %s (no limit set)."
 msgstr "Este mês: %s (sem limite definido)."
 
 #. translators: 1: spent this month, 2: monthly limit
-#: admin/partials/everyalt-options-display.php:500
+#: admin/partials/everyalt-options-display.php:508
 #, php-format
 msgid "%1$s of %2$s"
 msgstr "%1$s de %2$s"
 
-#: admin/partials/everyalt-options-display.php:500
+#: admin/partials/everyalt-options-display.php:508
 msgid "Monthly spending limit used"
 msgstr "Limite de gastos mensal utilizado"
 
-#: admin/partials/everyalt-options-display.php:506
+#: admin/partials/everyalt-options-display.php:514
 msgid "Month"
 msgstr "Mês"
 
-#: admin/partials/everyalt-options-display.php:507
+#: admin/partials/everyalt-options-display.php:515
 msgid "Requests"
 msgstr "Solicitações"
 
-#: admin/partials/everyalt-options-display.php:508
+#: admin/partials/everyalt-options-display.php:516
 msgid "Estimated cost"
 msgstr "Custo estimado"
 
-#: admin/partials/everyalt-options-display.php:509
+#: admin/partials/everyalt-options-display.php:517
 msgid "By model"
 msgstr "Por modelo"
 
-#: admin/partials/everyalt-options-display.php:533
+#: admin/partials/everyalt-options-display.php:541
 msgid "No spending recorded yet."
 msgstr "Nenhum gasto registrado ainda."
 
-#: admin/partials/everyalt-options-display.php:535
+#: admin/partials/everyalt-options-display.php:543
 msgid "Estimated from the tokens each request used and the provider’s published prices. Your provider’s invoice is authoritative."
 msgstr "Estimado com base nos tokens usados em cada solicitação e nos preços publicados pelo provedor. A fatura do seu provedor é o valor oficial."
 
-#: admin/partials/everyalt-options-display.php:537
+#: admin/partials/everyalt-options-display.php:545
 msgid "Generation Log"
 msgstr "Registro de geração"
 
-#: admin/partials/everyalt-options-display.php:538
+#: admin/partials/everyalt-options-display.php:546
 msgid "Last 100 alt text generation attempts (successes and failures)."
 msgstr "Últimas 100 tentativas de geração de texto alternativo (sucessos e falhas)."
 
-#: admin/partials/everyalt-options-display.php:541
+#: admin/partials/everyalt-options-display.php:549
 msgid "Export as CSV"
 msgstr "Exportar como CSV"
 
-#: admin/partials/everyalt-options-display.php:549
+#: admin/partials/everyalt-options-display.php:557
 msgid "Attachment"
 msgstr "Anexo"
 
-#: admin/partials/everyalt-options-display.php:553
+#: admin/partials/everyalt-options-display.php:561
 msgid "Cost"
 msgstr "Custo"
 
-#: admin/partials/everyalt-options-display.php:605
+#: admin/partials/everyalt-options-display.php:613
 msgid "No log entries yet. Generate alt text from the Bulk tab or when uploading images to populate this log."
 msgstr "Ainda não há entradas no registro. Gere texto alternativo na aba Em massa ou ao enviar imagens para preencher este registro."
+
+#. translators: PHP date format for the month prices were last checked, e.g. "F Y" (October 2026). See https://www.php.net/manual/datetime.format.php
+#: includes/class-everyalt-providers.php:144
+msgctxt "prices as-of date format"
+msgid "F Y"
+msgstr "F \\d\\e Y"
 
 #: includes/class-everyalt-queue.php:199
 msgid "Image no longer exists."
