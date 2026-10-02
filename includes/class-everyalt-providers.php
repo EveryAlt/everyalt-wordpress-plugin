@@ -7,7 +7,8 @@
  * (280 tokens per image instead of 1,120) and reports thinking tokens separately. Every_Alt_OpenAI builds
  * both request styles; every provider receives the image inline as base64.
  *
- * Prices are the providers' published regular (non-promotional) rates in USD per 1M tokens, as of September 2026.
+ * Prices are the providers' published regular (non-promotional) rates in USD per 1M tokens, as of
+ * PRICES_AS_OF. Update that date whenever prices here are re-checked.
  * They are used for the cost estimates shown in Settings and Logs, and can be overridden with the
  * everyalt_input_token_price_per_million / everyalt_output_token_price_per_million filters.
  *
@@ -23,8 +24,11 @@ class Every_Alt_Providers {
 	/** Option holding the selected model slug (a key of models()). */
 	const MODEL_OPTION = 'every_alt_model';
 
-	/** Model used when none has been chosen (and for installs upgrading from gpt-5-nano). */
-	const DEFAULT_MODEL = 'openai-gpt-5.4-nano';
+	/** Date the prices in models() were last checked against the providers' pricing pages (Y-m-d). */
+	const PRICES_AS_OF = '2026-10-02';
+
+	/** Model used when none has been chosen, or when the saved model has been retired. */
+	const DEFAULT_MODEL = 'openai-gpt-6-luna';
 
 	/**
 	 * Providers, keyed by provider slug.
@@ -92,13 +96,14 @@ class Every_Alt_Providers {
 	 */
 	public static function models() {
 		return array(
-			'openai-gpt-5.4-nano'           => array(
+			'openai-gpt-6-luna'             => array(
 				'provider'     => 'openai',
-				'model'        => 'gpt-5.4-nano',
-				'label'        => 'GPT-5.4 nano',
-				'input_price'  => 0.20,
-				'output_price' => 1.25,
-				'params'       => array(),
+				'model'        => 'gpt-6-luna',
+				'label'        => 'GPT-6 Luna',
+				'input_price'  => 0.10,
+				'output_price' => 0.50,
+				// Luna models default to medium reasoning; alt text doesn't need it, and it's billed as output.
+				'params'       => array( 'reasoning_effort' => 'none' ),
 			),
 			'gemini-3.1-flash-lite'         => array(
 				'provider'     => 'gemini',
@@ -127,6 +132,43 @@ class Every_Alt_Providers {
 				'params'       => array(),
 			),
 		);
+	}
+
+	/**
+	 * PRICES_AS_OF as a localized month and year, e.g. "October 2026", "octubre de 2026", "2026年10月".
+	 *
+	 * @return string
+	 */
+	public static function prices_as_of() {
+		/* translators: PHP date format for the month prices were last checked, e.g. "F Y" (October 2026). See https://www.php.net/manual/datetime.format.php */
+		return date_i18n( _x( 'F Y', 'prices as-of date format', 'everyalt' ), strtotime( self::PRICES_AS_OF ) );
+	}
+
+	/**
+	 * Models that were offered in earlier versions, slug => label. Kept so logs and spending history
+	 * still show a readable name; they can't be selected, and a saved one falls back to DEFAULT_MODEL.
+	 *
+	 * @return array
+	 */
+	public static function retired_models() {
+		return array(
+			'openai-gpt-5.4-nano' => 'GPT-5.4 nano',
+		);
+	}
+
+	/**
+	 * Display label for a model slug, including retired models (falls back to the slug itself).
+	 *
+	 * @param string $slug
+	 * @return string
+	 */
+	public static function model_label( $slug ) {
+		$models  = self::models();
+		$retired = self::retired_models();
+		if ( isset( $models[ $slug ] ) ) {
+			return $models[ $slug ]['label'];
+		}
+		return isset( $retired[ $slug ] ) ? $retired[ $slug ] : (string) $slug;
 	}
 
 	/**

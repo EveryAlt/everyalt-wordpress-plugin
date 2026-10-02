@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/EveryAlt-1.1.0-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.1.0" />
+  <img src="https://img.shields.io/badge/EveryAlt-1.1.1-7c3aed?style=for-the-badge&labelColor=5b21b6" alt="EveryAlt 1.1.1" />
   <img src="https://img.shields.io/badge/WordPress-5.5%2B-21759b?style=flat-square&logo=wordpress" alt="WordPress" />
   <img src="https://img.shields.io/badge/PHP-7.0%2B-777BB4?style=flat-square&logo=php" alt="PHP" />
   <img src="https://img.shields.io/badge/license-GPLv2-green?style=flat-square" alt="License" />
@@ -72,14 +72,14 @@ Choose a model in **Settings**. Every model reads the image itself and writes th
 
 | Model | Provider | Input / 1M tokens | Output / 1M tokens |
 |-------|----------|------------------:|-------------------:|
-| **GPT-5.4 nano** (default) | OpenAI | $0.20 | $1.25 |
+| **GPT-6 Luna** (default) | OpenAI | $0.10 | $0.50 |
 | **Gemini 3.1 Flash-Lite** | Google Gemini | $0.25 | $1.50 |
 | **DeepSeek V4.1 Flash** | DeepInfra | $0.20 | $0.60 |
 | **GLM-5.3-Flash** | DeepInfra | $0.15 | $0.50 |
 
-Prices are each provider’s published regular rates as of September 2026 and can change: [OpenAI pricing](https://openai.com/api/pricing/) · [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing) · [DeepInfra pricing](https://deepinfra.com/pricing). The actual cost of every image is recorded on the **Logs** tab.
+Prices are each provider’s published regular rates as of October 2026 and can change: [OpenAI pricing](https://openai.com/api/pricing/) · [Gemini pricing](https://ai.google.dev/gemini-api/docs/pricing) · [DeepInfra pricing](https://deepinfra.com/pricing). The actual cost of every image is recorded on the **Logs** tab.
 
-> **Upgrading from 1.0.x?** Earlier versions used `gpt-5-nano`, which OpenAI is retiring. Existing installs switch to **GPT-5.4 nano** automatically. Your OpenAI key keeps working.
+> **Upgrading?** OpenAI is retiring `gpt-5-nano` and GPT-5.4 nano (shutdown April 1, 2027). Installs using either switch to **GPT-6 Luna**, OpenAI's recommended replacement, automatically. Your OpenAI key keeps working, and if you chose Gemini or DeepInfra, that choice is kept.
 
 ### Getting a key
 
@@ -148,6 +148,10 @@ The plugin uses the `everyalt` text domain and ships with a `.pot` in `languages
 ---
 
 ## 📝 Changelog
+
+### 1.1.1
+- **Changed** the default OpenAI model is now **GPT-6 Luna**, OpenAI's recommended replacement for GPT-5.4 nano (which shuts down April 1, 2027). It's half the price per token ($0.10 input / $0.50 output per 1M tokens), and EveryAlt turns its reasoning off, as alt text doesn't need it. Sites using GPT-5.4 nano switch automatically; sites using Gemini or DeepInfra keep their choice.
+- **Improved** the "prices as of" date in Settings is now set in one place and shown in each site's language, so future price updates don't need retranslating.
 
 ### 1.1.0
 - **Accessibility (WCAG 2.1 AA).** A full review of every screen, with all failures fixed:

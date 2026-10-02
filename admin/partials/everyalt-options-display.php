@@ -100,7 +100,15 @@ $everyalt_new_tab = '<span class="screen-reader-text"> ' . esc_html__( '(opens i
 							<?php endforeach; ?>
 						</fieldset>
 						<p class="description">
-							<?php esc_html_e( 'All models read the image and write alt text and titles the same way. Prices are each provider’s published rates as of September 2026 and may change. You pay the provider directly; EveryAlt never bills you. The actual cost of each image is recorded on the Logs tab.', 'everyalt' ); ?>
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: %s: month and year the prices were checked, e.g. October 2026 */
+									__( 'All models read the image and write alt text and titles the same way. Prices are each provider’s published rates as of %s and may change. You pay the provider directly; EveryAlt never bills you. The actual cost of each image is recorded on the Logs tab.', 'everyalt' ),
+									Every_Alt_Providers::prices_as_of()
+								)
+							);
+							?>
 						</p>
 						<p class="description">
 							<?php
@@ -519,7 +527,7 @@ $everyalt_new_tab = '<span class="screen-reader-text"> ' . esc_html__( '(opens i
 								<?php
 								$everyalt_parts = array();
 								foreach ( $everyalt_row['models'] as $everyalt_slug => $everyalt_m ) {
-									$everyalt_label   = isset( $everyalt_models[ $everyalt_slug ] ) ? $everyalt_models[ $everyalt_slug ]['label'] : $everyalt_slug;
+									$everyalt_label   = Every_Alt_Providers::model_label( $everyalt_slug );
 									$everyalt_parts[] = sprintf( '%s: %s (%s)', $everyalt_label, Every_Alt_Usage::format_usd( $everyalt_m['cost'] ), number_format_i18n( $everyalt_m['requests'] ) );
 								}
 								echo esc_html( implode( ' · ', $everyalt_parts ) );

@@ -47,7 +47,7 @@ class Every_Alt_OpenAI {
 	/** @var array Provider definition from Every_Alt_Providers::providers(). */
 	private $provider_def;
 
-	/** @var string Model ID sent in the request (e.g. gpt-5.4-nano). */
+	/** @var string Model ID sent in the request (e.g. gpt-6-luna). */
 	private $model;
 
 	/**
@@ -72,7 +72,7 @@ class Every_Alt_OpenAI {
 	}
 
 	/**
-	 * Display name of the model in use, e.g. "GPT-5.4 nano (OpenAI)", for logs.
+	 * Display name of the model in use, e.g. "GPT-6 Luna (OpenAI)", for logs.
 	 *
 	 * @return string
 	 */
